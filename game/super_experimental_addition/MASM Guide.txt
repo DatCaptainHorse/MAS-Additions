@@ -1,0 +1,39 @@
+#######################################################################################
+
+Hello and welcome to using Singularity Engine (well, an application using the engine)
+
+The main use for this addition/module is the ability to use Python 3 and LUA (with some additional features)
+
+Communication between Ren'Py's Python 2 and the Applications Python 3 can be done multiple ways, multi-platform choices would be sockets or a file for example.
+
+Scripts are kept in the 'scripts' folder, any Python (.py) or LUA (.lua) scripts are automatically loaded from there.
+There are 2 example scripts to show you how some things work
+
+!WARNING!
+Import of packages with .pyd files requires Python to be installed on system, since the packages themself require platform specific Python packages or features.
+Most if not all unix systems like Mac and Linux come with Python pre-installed, which is not an issue, however Windows does not.
+
+#########
+# Scripting  #
+#########
+
+Application loops and functions:
+	Start (called once when application starts)
+	Tick (called once every second, consistent)
+	Update (called ~16 times per second, varies by performance)
+	Render (called as fast as the internal engine loop goes, depending how fast your system is)
+	OnQuit (called once when the application is quitting)
+	
+Bind functions:
+	 Log("")(Log something)
+	 HideConsole(0/1) (Hide that CMD window, Windows only)
+	 AudioPlayOnce("relative path to file", 0.5) Play an audio clip (OGG Vorbis and WAV supported) (Audio side is disabled for now to reduce any possible platform issues)
+	 ApplicationStop() (Stop the application from running)
+	 
+	 
+Try to write non-blocking code if possible so you won't block the execution of other scripts. Or use Python's threads to get your work off main loops.
+ie. don't use never-ending while or for loops in Start function. Use the Update, Render and Tick functions for those.
+
+The engine will try to catch up in missed function calls (ex. Tick could run many times per second for brief moment)
+
+########################################################################################
