@@ -32,7 +32,7 @@ Bind functions:
 	 
 	 
 Try to write non-blocking code if possible so you won't block the execution of other scripts. Or use Python's threads to get your work off main loops.
-ie. don't use never-ending while or for loops in Start function. Use the Update, Render and Tick functions for those.
+ie. don't use never-ending while or for loops in Start function. Treat the Update, Render and Tick functions as big while/for loops for your code.
 
 The engine will try to catch up in missed function calls (ex. Tick could run many times per second for brief moment)
 
