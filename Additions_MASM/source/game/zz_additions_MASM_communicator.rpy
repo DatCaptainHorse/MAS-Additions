@@ -94,6 +94,6 @@ init 4 python:
             communicator.getClient()
 
             if isAdditionFirstRun("MASMC"):
-                communicator.client.sendall("first".encode('utf-8'))
+                communicator.client.sendall("first")
             else:
-                communicator.client.sendall("notFirst".encode('utf-8'))
+                communicator.client.sendall("notFirst")
