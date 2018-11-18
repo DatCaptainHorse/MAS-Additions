@@ -1,0 +1,6 @@
+#####
+
+Copy the downloaded binaries and everything else
+into this directory where this text file sits at
+
+#####

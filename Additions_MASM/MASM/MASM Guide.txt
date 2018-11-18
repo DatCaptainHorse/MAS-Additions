@@ -1,0 +1,38 @@
+#######################################################################################
+
+Hello and welcome to using Monika After Story Module, powered by unreleased, in-development Singularity Engine
+
+The main use for this addition/module is the ability to use Python 3 and LUA (with some additional features)
+
+Communication between Ren'Py's Python 2 and the Applications Python 3 can be done multiple ways, multi-platform choices would be sockets or a file for example.
+
+Scripts are kept in the 'scripts' folder, any Python (.py) or LUA (.lua) scripts are automatically loaded from there.
+There are 2 example scripts to show you how some things work
+
+OpenAL-Soft library is used for audio playback, only OGG Vorbis sound file types are currently supported.
+
+#########
+# Scripting  #
+#########
+
+Application loops and functions:
+	Start (called once when application starts)
+	Tick (called once every second)
+	Update (called multiple times per second, varies by performance)
+	Render (called as fast as the internal engine loop goes, depending how fast your system is)
+	OnQuit (called once when the application is quitting)
+	
+Bind functions:
+	SE.Log("log text") # Log something
+	SE.SoundAdd2D("name", "relative path to file") # Add a 2D sound source
+	SE.SoundAdd3D("name", "relative path to file") # Add a 3D sound source
+	SE.SoundPlay("name") # Play a sound once
+	SE.SoundLoop("name") # Loop a sound
+	SE.SoundStop("name") # Stop a sound
+	SE.SoundPosition("name", (x, y, z)) # Set position for 3D sound source (positive z is behind the listener, negative z is in front)
+	SE.AudioEnableHRTF(true/false) # Enable or disable HRTF for 3D sound sources. HRTF makes it easier to hear where something is located (depends on persons ear shape whether certain HRTF works)
+	 
+Try to write non-blocking code if possible so you won't block the execution of other scripts. Or use Python's threads to get your work off main loops.
+ie. don't use never-ending while or for loops in Start function. Treat the Update, Render and Tick functions as big while/for loops for your code.
+
+The engine will try to catch up in missed function calls (ex. Tick could run many times per second for brief moment)
