@@ -1,4 +1,3 @@
-import singularityengine as SE
 import socket
 
 client = None
@@ -46,7 +45,7 @@ def receiveData():
 			return
 		
 		if data is not None and data == 'first':
-			SE.Log("\nWhats this? Singularity.. Engine? How interesting..\n")
+			SE.Log("\nWhats this? How interesting..\n")
 			
 def sendData(toSend):
 	global client
