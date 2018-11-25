@@ -1,26 +1,38 @@
+# Using sockets to transfer data between Ren'Py and MASM
 import socket
 
 client = None
-data = None
+data = []
 execs = 0
+
+def hasData(dat):
+	global data
+	if dat in data:
+		data.remove(dat)
+		return True
+	else:
+		return False
 
 def connectMAS():
 	global client
 	global data
-	
-	if client is None:
+
+	if client == None:
 		SE.Log("\nConnecting to MAS..")
 	
 		client = socket.socket()
+		#client.setblocking(False)
+		client.settimeout(0.1)
+
 		host = socket.gethostname()
 		port = 12345
-		
-		# Using sockets to transfer data between Ren'Py and MASM
-		try:
-			client.connect((host, port))
-		except Exception as exc:
-			SE.Log("Failed to connect: ", exc)
-			return
+
+		while True:
+			try:
+				client.connect((host, port))
+			except socket.error: # Wait for connection
+				continue
+			break
 			
 		SE.Log("Connected!\n")
 		execs = 0
@@ -30,7 +42,7 @@ def receiveData():
 	global data
 	global execs
 	
-	if client is not None:
+	if client != None:
 		if execs >= 5:
 			SE.Log("Too many exceptions, attempting to reconnect..")
 			client.close()
@@ -38,18 +50,18 @@ def receiveData():
 			connectMAS()
 
 		try:
-			data = client.recv(64).decode('utf-8')
-		except:
-			SE.Log("Exception getting data")
-			execs += 1
-			return
+			dat = client.recv(64).decode('utf-8')
+			if dat != None:
+				data.append(dat)
+		except socket.timeout: # No data
+			pass
 		
-		if data is not None and data == 'first':
+		if hasData("first"):
 			SE.Log("\nWhats this? How interesting..\n")
 			
 def sendData(toSend):
 	global client
-	if client is not None:
+	if client != None:
 		client.sendall(toSend.encode('utf-8'))
 			
 def Start():

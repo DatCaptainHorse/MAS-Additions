@@ -1,4 +1,4 @@
-#Mimics the MAS server side script, run with system python
+# Mimics the MAS server side script, run with system python
 
 import socket
 import os, sys
@@ -7,29 +7,37 @@ import errno
 import threading
 
 data = []
+receiveData = True
 
 server = socket.socket()
+server.settimeout(0.1)
+
 host = socket.gethostname()
 port = 12345
-server.settimeout(10)
+
 server.bind((host, port))
-server.listen(5)
-client, addr = server.accept()
-client.setblocking(True)
-client.settimeout(5)
-#if additionFirstRun("Super Experimental Additions"):
-#client.sendall("first".encode('utf-8'))
-#client.sendall("recognizeFace".encode('utf-8'))
+server.listen()
+
+while True:
+	try:
+		client, addr = server.accept()
+	except socket.error: # Wait for connection
+		continue
+	break
+
+client.sendall("recognizeFace".encode('utf-8'))
 
 def comm():
-	while True:
+	while receiveData:
+		received = None
 		try:
-			received = client.recv(1024).decode('utf-8')
-			if received is not None:
-				data.append(received)
-				print("Received: {}\nDataSize: {}".format(received, len(data)))
-		except:
+			received = client.recv(64).decode('utf-8')
+		except socket.timeout: # No data received
 			pass
+
+		if received != None:
+			data.append(received)
+			print("Received: {}\tDataSize: {}".format(received, len(data)), end='\r')
 
 	client.close()
 	server.close()

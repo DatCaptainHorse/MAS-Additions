@@ -1,6 +1,5 @@
 # Just a script to make recognizing faces easier with few functions
 # LBPH + HAAR recognizer combo is capable of identifying person from another, and training runtime
-# Deep Neural Network is not capable of runtime training, but is much better at recognizing a face
 # DNN can be used in place for HAAR for detecting initial faces before LBPH recognition
 
 import os
@@ -11,30 +10,82 @@ import numpy as np
 face_recognizer_lbph = None
 face_recognizer_dnn = None
 persons = []
+onCam = None
 
-# Takes pictures with the webcam and saves them to the output directory, great for training needs
-# if the person is going to move a lot during the process, take a lot of pictures
+def camOn():
+	global onCam
+	if onCam == None:
+		onCam = cv2.VideoCapture(0)
+
+	if not onCam.isOpened():
+		print("Unable to open camera")
+		onCam == None
+		return False
+
+	return True
+
+def camOff():
+	global onCam
+	if onCam == None:
+		return True
+
+	if onCam.isOpened():
+		onCam.release()
+		return True
+
+	return False
+
+def camFrame():
+	global onCam
+	ret, frame = onCam.read()
+	if not ret:
+		return False
+	else:
+		return frame
+
+	return False
+
+# Takes pictures with the webcam and saves them to the output directory, used for training
 def take_faces(output_dir, count, delay = 0.25):
 	cam = cv2.VideoCapture(0)
 	
 	if not cam.isOpened():
-		print("Unable to open camera")
-		return
-
-	for i in range(0, count):
-		print ("Taking picture {}/{}".format(i + 1, count), end="\r")
+		print("Error: Unable to open camera")
+		return False
+	
+	completed = 0
+	while (completed < count):
+		if not cam.isOpened():
+			print("Error: Camera no longer open")
+			return False
+		
+		print ("Taking picture: {}/{}".format(completed + 1, count), end="\r")
 		ret, frame = cam.read()
 		if not ret:
 			continue
 			
-		if frame is not None:
-			img_name = output_dir + '/' + "face_{}.png".format(i)
-			cv2.imwrite(img_name, frame)
+		ars, recs = detect_faces_dnn(frame)
+		if ars == None:
+			continue
 
-			# Wait a bit between each picture
-			time.sleep(delay)
+		if len(ars) > 0:
+			img_name = output_dir + '/' + "face_{}.png".format(completed)
+			try:
+				cv2.imwrite(img_name, ars[0])
+			except:
+				break
+
+			completed = completed + 1;
+
+		# Wait a bit
+		time.sleep(delay)
 
 	cam.release()
+
+	if completed == count:
+		return True
+	else:
+		return False
 
 # Detect any faces inside an image using haar cascades
 # returns the face area images in gray and face rectangles
@@ -65,7 +116,7 @@ def detect_faces_haar(img):
 
 # Detect any faces inside an image using deep neural networks
 # uses pre-trained caffe models and protos
-# returns the face area images in color and face rectangles
+# returns the face area images in gray and face rectangles
 def detect_faces_dnn(img):
 	global face_recognizer_dnn
 	
@@ -75,7 +126,7 @@ def detect_faces_dnn(img):
 	if face_recognizer_dnn is None:
 		print ("Loading pre-trained Caffe model")
 		face_recognizer_dnn = cv2.dnn.readNetFromCaffe(realPath + '/' + "face.prototxt", realPath + '/' + "face.caffemodel")
-	
+
 	# Resize image and blob it!
 	(h, w) = img.shape[:2]
 	resizedImg = cv2.resize(img, (224, 224))
@@ -102,7 +153,9 @@ def detect_faces_dnn(img):
 		(x, y, wi, he) = box.astype("int")
 		
 		faceArea = img[y:y+wi, x:x+he]
-		areas.append(faceArea)
+		grayed = cv2.cvtColor(faceArea, cv2.COLOR_BGR2GRAY)
+		grayed = cv2.equalizeHist(grayed)
+		areas.append(grayed)
 		
 		rects.append([x, y, wi, he])
 		

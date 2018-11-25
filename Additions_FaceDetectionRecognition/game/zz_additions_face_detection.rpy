@@ -21,18 +21,20 @@ label monika_experimental_webcamera:
                         m 1j "Please look into the camera...{nw}"
                         python:
                             def webcamSee():
-                                MASM_DataCommunicator.clientSend("recognizeFace")
+                                MASM_Communicator.clientSend('recognizeFace')
 
-                                seenYet = False
-                                while not seenYet: # Makes game unresponsive while loop is going
-                                    if 'seeYou' in MASM_DataCommunicator.data:
-                                        return True
+                                result = None
+                                while result is None: # TODO: Makes game unresponsive while loop is going
+                                    if MASM_Communicator.hasData('seeYou'):
+                                        result = True
                                         break
-                                    elif 'cantSee' in MASM_DataCommunicator.data:
-                                        return False
+                                    elif MASM_Communicator.hasData('cantSee'):
+                                        result = False
                                         break
 
-                                    time.sleep(0.15) # Just to ease on the loop
+                                    time.sleep(0.25) # Just to ease on the loop
+
+                                return result
 
                             success = webcamSee()
 
