@@ -15,12 +15,10 @@ https://github.com/Monika-After-Story/MonikaModDev
 * MIDI, adds MIDI functionality, routes MIDI input to MAS piano keys. Requires MASM
 
 
-# Installing an addition from clone (temporary)
+# Compiling .rpyc's from source
 
-1. Install Additions_Core if it already isn't (.rpyc files from "compiled" folder) into your "DDLC/game/" folder.
+1. Copy the .rpy files you need into game folder in MAS's Ren'Py project folder.
 
-2. Install addition, .rpyc files from "compiled" folder go into "DDLC/game/" folder, same for the MASM folder.
+2. Copy any necessary MASM scripts and binaries into MASM folder in the MAS game folder.
 
-3. Launch game, hopefully works.
-
-4. You can disable addition in "Addition Settings" in Settings menu at lower right corner.
+3. Launch once from Ren'Py launcher, Ren'Py should generate the compiled .rpyc files.
