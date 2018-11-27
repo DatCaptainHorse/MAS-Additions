@@ -22,3 +22,8 @@ https://github.com/Monika-After-Story/MonikaModDev
 2. Copy any necessary MASM scripts and binaries into MASM folder in the MAS game folder.
 
 3. Launch once from Ren'Py launcher, Ren'Py should generate the compiled .rpyc files.
+
+
+# Reporting bugs and issues
+
+Please report any bugs and issues you may have to DatHorse#9516 on Discord
