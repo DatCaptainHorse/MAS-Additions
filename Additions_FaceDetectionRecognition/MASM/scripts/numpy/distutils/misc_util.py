@@ -13,7 +13,6 @@ import multiprocessing
 
 import distutils
 from distutils.errors import DistutilsError
-from distutils.msvccompiler import get_build_architecture
 try:
     from threading import local as tlocal
 except ImportError:
@@ -260,7 +259,7 @@ def minrelpath(path):
     return os.sep.join(l)
 
 def sorted_glob(fileglob):
-    """sorts output of python glob for http://bugs.python.org/issue30461
+    """sorts output of python glob for https://bugs.python.org/issue30461
     to allow extensions to have reproducible build results"""
     return sorted(glob.glob(fileglob))
 
@@ -320,7 +319,7 @@ def make_temp_file(suffix='', prefix='', text=True):
     return fo, name
 
 # Hooks for colored terminal output.
-# See also http://www.livinglogic.de/Python/ansistyle
+# See also https://web.archive.org/web/20100314204946/http://www.livinglogic.de/Python/ansistyle
 def terminal_has_colors():
     if sys.platform=='cygwin' and 'USE_COLOR' not in os.environ:
         # Avoid importing curses that causes illegal operation
@@ -1567,7 +1566,6 @@ class Configuration(object):
         """Common implementation for add_library and add_installed_library. Do
         not use directly"""
         build_info = copy.copy(build_info)
-        name = name #+ '__OF__' + self.name
         build_info['sources'] = sources
 
         # Sometimes, depends is not set up to an empty list by default, and if
@@ -1693,7 +1691,6 @@ class Configuration(object):
         """
         if subst_dict is None:
             subst_dict = {}
-        basename = os.path.splitext(template)[0]
         template = os.path.join(self.package_path, template)
 
         if self.name in self.installed_pkg_config:
@@ -1836,22 +1833,16 @@ class Configuration(object):
     def _get_svn_revision(self, path):
         """Return path's SVN revision number.
         """
-        revision = None
-        m = None
-        cwd =  os.getcwd()
         try:
-            os.chdir(path or '.')
-            p = subprocess.Popen(['svnversion'], shell=True,
-                    stdout=subprocess.PIPE, stderr=None,
-                    close_fds=True)
-            sout = p.stdout
-            m = re.match(r'(?P<revision>\d+)', sout.read())
-        except Exception:
+            output = subprocess.check_output(
+                ['svnversion'], shell=True, cwd=path)
+        except (subprocess.CalledProcessError, OSError):
             pass
-        os.chdir(cwd)
-        if m:
-            revision = int(m.group('revision'))
-            return revision
+        else:
+            m = re.match(br'(?P<revision>\d+)', output)
+            if m:
+                return int(m.group('revision'))
+
         if sys.platform=='win32' and os.environ.get('SVN_ASP_DOT_NET_HACK', None):
             entries = njoin(path, '_svn', 'entries')
         else:
@@ -1863,32 +1854,26 @@ class Configuration(object):
             if fstr[:5] == '<?xml':  # pre 1.4
                 m = re.search(r'revision="(?P<revision>\d+)"', fstr)
                 if m:
-                    revision = int(m.group('revision'))
+                    return int(m.group('revision'))
             else:  # non-xml entries file --- check to be sure that
                 m = re.search(r'dir[\n\r]+(?P<revision>\d+)', fstr)
                 if m:
-                    revision = int(m.group('revision'))
-        return revision
+                    return int(m.group('revision'))
+        return None
 
     def _get_hg_revision(self, path):
         """Return path's Mercurial revision number.
         """
-        revision = None
-        m = None
-        cwd =  os.getcwd()
         try:
-            os.chdir(path or '.')
-            p = subprocess.Popen(['hg identify --num'], shell=True,
-                    stdout=subprocess.PIPE, stderr=None,
-                    close_fds=True)
-            sout = p.stdout
-            m = re.match(r'(?P<revision>\d+)', sout.read())
-        except Exception:
+            output = subprocess.check_output(
+                ['hg identify --num'], shell=True, cwd=path)
+        except (subprocess.CalledProcessError, OSError):
             pass
-        os.chdir(cwd)
-        if m:
-            revision = int(m.group('revision'))
-            return revision
+        else:
+            m = re.match(br'(?P<revision>\d+)', output)
+            if m:
+                return int(m.group('revision'))
+
         branch_fn = njoin(path, '.hg', 'branch')
         branch_cache_fn = njoin(path, '.hg', 'branch.cache')
 
@@ -1909,8 +1894,9 @@ class Configuration(object):
                     continue
                 branch_map[branch1] = revision1
 
-            revision = branch_map.get(branch0)
-        return revision
+            return branch_map.get(branch0)
+
+        return None
 
 
     def get_version(self, version_file=None, version_variable=None):
@@ -2012,7 +1998,6 @@ class Configuration(object):
                     f.write('version = %r\n' % (version))
                     f.close()
 
-                import atexit
                 def rm_file(f=target,p=self.info):
                     if delete:
                         try: os.remove(f); p('removed '+f)
@@ -2054,7 +2039,6 @@ class Configuration(object):
                     f.write('version = %r\n' % (version))
                     f.close()
 
-                import atexit
                 def rm_file(f=target,p=self.info):
                     if delete:
                         try: os.remove(f); p('removed '+f)
@@ -2229,7 +2213,6 @@ def is_bootstrapping():
         return True
     except AttributeError:
         return False
-        __NUMPY_SETUP__ = False
 
 
 #########################
@@ -2339,3 +2322,9 @@ def msvc_version(compiler):
         raise ValueError("Compiler instance is not msvc (%s)"\
                          % compiler.compiler_type)
     return compiler._MSVCCompiler__version
+
+def get_build_architecture():
+    # Importing distutils.msvccompiler triggers a warning on non-Windows
+    # systems, so delay the import to here.
+    from distutils.msvccompiler import get_build_architecture
+    return get_build_architecture()

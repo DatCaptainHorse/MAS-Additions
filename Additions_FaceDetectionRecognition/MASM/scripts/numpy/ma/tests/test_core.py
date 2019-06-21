@@ -10,7 +10,6 @@ __author__ = "Pierre GF Gerard-Marchant"
 
 import sys
 import warnings
-import pickle
 import operator
 import itertools
 import textwrap
@@ -27,7 +26,7 @@ from numpy.testing import (
     assert_raises, assert_warns, suppress_warnings
     )
 from numpy import ndarray
-from numpy.compat import asbytes, asbytes_nested
+from numpy.compat import asbytes
 from numpy.ma.testutils import (
     assert_, assert_array_equal, assert_equal, assert_almost_equal,
     assert_equal_records, fail_if_equal, assert_not_equal,
@@ -50,6 +49,7 @@ from numpy.ma.core import (
     ravel, repeat, reshape, resize, shape, sin, sinh, sometrue, sort, sqrt,
     subtract, sum, take, tan, tanh, transpose, where, zeros,
     )
+from numpy.core.numeric import pickle
 
 pi = np.pi
 
@@ -233,7 +233,7 @@ class TestMaskedArray(object):
         x = np.array([('A', 0)], dtype={'names':['f0','f1'],
                                         'formats':['S4','i8'],
                                         'offsets':[0,8]})
-        data = array(x) # used to fail due to 'V' padding field in x.dtype.descr
+        array(x)  # used to fail due to 'V' padding field in x.dtype.descr
 
     def test_asarray(self):
         (x, y, a10, m1, m2, xm, ym, z, zm, xf) = self.d
@@ -519,8 +519,6 @@ class TestMaskedArray(object):
               fill_value=999999)''')
         )
 
-
-
     def test_str_repr_legacy(self):
         oldopts = np.get_printoptions()
         np.set_printoptions(legacy='1.13')
@@ -562,50 +560,55 @@ class TestMaskedArray(object):
                      True,                            # Fully masked
                      False)                           # Fully unmasked
 
-            for mask in masks:
-                a.mask = mask
-                a_pickled = pickle.loads(a.dumps())
-                assert_equal(a_pickled._mask, a._mask)
-                assert_equal(a_pickled._data, a._data)
-                if dtype in (object, int):
-                    assert_equal(a_pickled.fill_value, 999)
-                else:
-                    assert_equal(a_pickled.fill_value, dtype(999))
-                assert_array_equal(a_pickled.mask, mask)
+            for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+                for mask in masks:
+                    a.mask = mask
+                    a_pickled = pickle.loads(pickle.dumps(a, protocol=proto))
+                    assert_equal(a_pickled._mask, a._mask)
+                    assert_equal(a_pickled._data, a._data)
+                    if dtype in (object, int):
+                        assert_equal(a_pickled.fill_value, 999)
+                    else:
+                        assert_equal(a_pickled.fill_value, dtype(999))
+                    assert_array_equal(a_pickled.mask, mask)
 
     def test_pickling_subbaseclass(self):
         # Test pickling w/ a subclass of ndarray
         x = np.array([(1.0, 2), (3.0, 4)],
                      dtype=[('x', float), ('y', int)]).view(np.recarray)
         a = masked_array(x, mask=[(True, False), (False, True)])
-        a_pickled = pickle.loads(a.dumps())
-        assert_equal(a_pickled._mask, a._mask)
-        assert_equal(a_pickled, a)
-        assert_(isinstance(a_pickled._data, np.recarray))
+        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+            a_pickled = pickle.loads(pickle.dumps(a, protocol=proto))
+            assert_equal(a_pickled._mask, a._mask)
+            assert_equal(a_pickled, a)
+            assert_(isinstance(a_pickled._data, np.recarray))
 
     def test_pickling_maskedconstant(self):
         # Test pickling MaskedConstant
         mc = np.ma.masked
-        mc_pickled = pickle.loads(mc.dumps())
-        assert_equal(mc_pickled._baseclass, mc._baseclass)
-        assert_equal(mc_pickled._mask, mc._mask)
-        assert_equal(mc_pickled._data, mc._data)
+        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+            mc_pickled = pickle.loads(pickle.dumps(mc, protocol=proto))
+            assert_equal(mc_pickled._baseclass, mc._baseclass)
+            assert_equal(mc_pickled._mask, mc._mask)
+            assert_equal(mc_pickled._data, mc._data)
 
     def test_pickling_wstructured(self):
         # Tests pickling w/ structured array
         a = array([(1, 1.), (2, 2.)], mask=[(0, 0), (0, 1)],
                   dtype=[('a', int), ('b', float)])
-        a_pickled = pickle.loads(a.dumps())
-        assert_equal(a_pickled._mask, a._mask)
-        assert_equal(a_pickled, a)
+        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+            a_pickled = pickle.loads(pickle.dumps(a, protocol=proto))
+            assert_equal(a_pickled._mask, a._mask)
+            assert_equal(a_pickled, a)
 
     def test_pickling_keepalignment(self):
         # Tests pickling w/ F_CONTIGUOUS arrays
         a = arange(10)
         a.shape = (-1, 2)
         b = a.T
-        test = pickle.loads(pickle.dumps(b))
-        assert_equal(test, b)
+        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+            test = pickle.loads(pickle.dumps(b, protocol=proto))
+            assert_equal(test, b)
 
     def test_single_element_subscript(self):
         # Tests single element subscripts of Maskedarrays.
@@ -792,7 +795,6 @@ class TestMaskedArray(object):
                              dtype = "int, (2,3)float, float")
         control = "(0, [[--, 0.0, --], [0.0, 0.0, --]], 0.0)"
         assert_equal(str(t_2d0), control)
-
 
     def test_flatten_structured_array(self):
         # Test flatten_structured_array on arrays
@@ -2027,6 +2029,17 @@ class TestFillingValues(object):
         assert_equal(x.fill_value, 999.)
         assert_equal(x._fill_value, np.array(999.))
 
+    def test_subarray_fillvalue(self):
+        # gh-10483   test multi-field index fill value
+        fields = array([(1, 1, 1)],
+                      dtype=[('i', int), ('s', '|S8'), ('f', float)])
+        with suppress_warnings() as sup:
+            sup.filter(FutureWarning, "Numpy has detected")
+            subfields = fields[['i', 'f']]
+            assert_equal(tuple(subfields.fill_value), (999999, 1.e+20))
+            # test comparison does not raise:
+            subfields[1:] == subfields[:-1]
+
     def test_fillvalue_exotic_dtype(self):
         # Tests yet more exotic flexible dtypes
         _check_fill_value = np.ma.core._check_fill_value
@@ -2388,9 +2401,9 @@ class TestMaskedArrayInPlaceArithmetics(object):
         assert_equal(xm, y + 1)
 
         (x, _, xm) = self.floatdata
-        id1 = x.data.ctypes._data
+        id1 = x.data.ctypes.data
         x += 1.
-        assert_(id1 == x.data.ctypes._data)
+        assert_(id1 == x.data.ctypes.data)
         assert_equal(x, y + 1.)
 
     def test_inplace_addition_array(self):
@@ -3952,12 +3965,8 @@ class TestMaskedArrayFunctions(object):
 
     def test_masked_where_shape_constraint(self):
         a = arange(10)
-        try:
-            test = masked_equal(1, a)
-        except IndexError:
-            pass
-        else:
-            raise AssertionError("Should have failed...")
+        with assert_raises(IndexError):
+            masked_equal(1, a)
         test = masked_equal(a, 1)
         assert_equal(test.mask, [0, 1, 0, 0, 0, 0, 0, 0, 0, 0])
 
@@ -4951,13 +4960,13 @@ class TestMaskedConstant(object):
 
     def test_pickle(self):
         from io import BytesIO
-        import pickle
 
-        with BytesIO() as f:
-            pickle.dump(np.ma.masked, f)
-            f.seek(0)
-            res = pickle.load(f)
-        assert_(res is np.ma.masked)
+        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+            with BytesIO() as f:
+                pickle.dump(np.ma.masked, f, protocol=proto)
+                f.seek(0)
+                res = pickle.load(f)
+            assert_(res is np.ma.masked)
 
     def test_copy(self):
         # gh-9328
@@ -5179,3 +5188,18 @@ def test_astype_basic(dt1, dt2):
     assert_(dst.fill_value.dtype == dt2)
 
     assert_equal(src, dst)
+
+
+def test_fieldless_void():
+    dt = np.dtype([])  # a void dtype with no fields
+    x = np.empty(4, dt)
+
+    # these arrays contain no values, so there's little to test - but this
+    # shouldn't crash
+    mx = np.ma.array(x)
+    assert_equal(mx.dtype, x.dtype)
+    assert_equal(mx.shape, x.shape)
+
+    mx = np.ma.array(x, mask=x)
+    assert_equal(mx.dtype, x.dtype)
+    assert_equal(mx.shape, x.shape)

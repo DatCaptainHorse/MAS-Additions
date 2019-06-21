@@ -23,7 +23,10 @@ class BaseIntelFCompiler(FCompiler):
                                            f + '.f', '-o', f + '.o']
 
     def runtime_library_dir_option(self, dir):
-        return '-Wl,-rpath="%s"' % dir
+        # TODO: could use -Xlinker here, if it's supported
+        #assert "," not in dir
+
+        return '-Wl,-rpath=%s' % dir
 
 
 class IntelFCompiler(BaseIntelFCompiler):
@@ -148,10 +151,10 @@ class IntelVisualFCompiler(BaseIntelFCompiler):
 
     executables = {
         'version_cmd'  : None,
-        'compiler_f77' : [None],
-        'compiler_fix' : [None],
+        'compiler_f77' : [None, "-FI", "-w90", "-w95"],
+        'compiler_fix' : [None, "-FI", "-4L72", "-w"],
         'compiler_f90' : [None],
-        'linker_so'    : [None],
+        'linker_so'    : ['<F90>', "-shared"],
         'archiver'     : [ar_exe, "/verbose", "/OUT:"],
         'ranlib'       : None
         }
@@ -163,7 +166,7 @@ class IntelVisualFCompiler(BaseIntelFCompiler):
     module_include_switch = '/I'
 
     def get_flags(self):
-        opt = ['/nologo', '/MD', '/nbs', '/names:lowercase', '/assume:underscore']
+        opt = ['/nologo', '/MD', '/nbs', '/names:lowercase', '/assume:underscore', '/recursive']
         return opt
 
     def get_flags_free(self):
@@ -176,7 +179,7 @@ class IntelVisualFCompiler(BaseIntelFCompiler):
         return ['/O1']  # Scipy test failures with /O2
 
     def get_flags_arch(self):
-        return ["/arch:IA32", "/QaxSSE3"]
+        return ["/QaxSSE3"]
 
     def runtime_library_dir_option(self, dir):
         raise NotImplementedError
@@ -209,7 +212,7 @@ class IntelEM64VisualFCompiler(IntelVisualFCompiler):
     version_match = simple_version_match(start=r'Intel\(R\).*?64,')
 
     def get_flags_arch(self):
-        return ['']
+        return ['/QaxSSE3']
 
 
 if __name__ == '__main__':

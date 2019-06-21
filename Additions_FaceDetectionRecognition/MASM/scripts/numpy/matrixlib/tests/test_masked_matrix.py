@@ -1,8 +1,5 @@
 from __future__ import division, absolute_import, print_function
 
-import pickle
-import pytest
-
 import numpy as np
 from numpy.ma.testutils import (assert_, assert_equal, assert_raises,
                                 assert_array_equal)
@@ -10,6 +7,7 @@ from numpy.ma.core import (masked_array, masked_values, masked, allequal,
                            MaskType, getmask, MaskedArray, nomask,
                            log, add, hypot, divide)
 from numpy.ma.extras import mr_
+from numpy.core.numeric import pickle
 
 
 class MMatrix(MaskedArray, np.matrix,):
@@ -79,10 +77,11 @@ class TestMaskedMatrix(object):
     def test_pickling_subbaseclass(self):
         # Test pickling w/ a subclass of ndarray
         a = masked_array(np.matrix(list(range(10))), mask=[1, 0, 1, 0, 0] * 2)
-        a_pickled = pickle.loads(a.dumps())
-        assert_equal(a_pickled._mask, a._mask)
-        assert_equal(a_pickled, a)
-        assert_(isinstance(a_pickled._data, np.matrix))
+        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
+            a_pickled = pickle.loads(pickle.dumps(a, protocol=proto))
+            assert_equal(a_pickled._mask, a._mask)
+            assert_equal(a_pickled, a)
+            assert_(isinstance(a_pickled._data, np.matrix))
 
     def test_count_mean_with_matrix(self):
         m = masked_array(np.matrix([[1, 2], [3, 4]]), mask=np.zeros((2, 2)))

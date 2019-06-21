@@ -71,12 +71,14 @@ def _dict_append(d, **kws):
         else:
             raise TypeError(repr(type(dv)))
 
-def _command_line_ok(_cache=[]):
+def _command_line_ok(_cache=None):
     """ Return True if command line does not contain any
     help or display requests.
     """
     if _cache:
         return _cache[0]
+    elif _cache is None:
+        _cache = []
     ok = True
     display_opts = ['--'+n for n in Distribution.display_option_names]
     for o in Distribution.display_options:
@@ -135,6 +137,8 @@ def setup(**attr):
         config = configuration()
         if hasattr(config, 'todict'):
             config = config.todict()
+        if 'version' in config and 'numpy' in config['packages']:
+            del config['version']
         _dict_append(new_attr, **config)
 
     # Move extension source libraries to libraries

@@ -1,5 +1,5 @@
 ﻿init 5 python:
-    registerAddition("SEAS", "Super Experimental Additions", "0.1.5")
+    registerAddition("SEAS", "Super Experimental Additions", "0.1.6")
     addEvent(Event(persistent.event_database,eventlabel="monika_experimental_webcamera",category=['mod'],prompt="Webcamera",random=False,unlocked=True,pool=True))
 
 label monika_experimental_webcamera:

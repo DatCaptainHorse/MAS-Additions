@@ -1,7 +1,6 @@
 from __future__ import division, print_function
 
-from os.path import join, split, dirname
-import os
+from os.path import join
 import sys
 from distutils.dep_util import newer
 from distutils.msvccompiler import get_build_version as get_msvc_build_version
@@ -39,9 +38,6 @@ def configuration(parent_package='',top_path=None):
                 ('_LARGEFILE64_SOURCE', '1')]
     if needs_mingw_ftime_workaround():
         defs.append(("NPY_NEEDS_MINGW_TIME_WORKAROUND", None))
-    # fix for 0.26 < cython < 0.29 and perhaps 0.28.5
-    # see https://github.com/cython/cython/issues/2494
-    defs.append(('CYTHON_SMALL_CODE', ''))
 
     libs = []
     # Configure mtrand

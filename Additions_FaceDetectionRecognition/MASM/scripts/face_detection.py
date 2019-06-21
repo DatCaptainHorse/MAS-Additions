@@ -1,6 +1,45 @@
+# Temporary quick & cheaty implementation before Python 3.8 is released
+# along with official modules like numpy and cv2 for Python 3.8
+
+import os
+import subprocess
+import socket
+import socketer
+
+faceDict = {}
+moods = ["neutral", "sad", "happy", "anger"]
+
+def cropFace(img, face):
+    for (x, y, w, h) in face:
+        faceCrop = img[y:y+h, x:x+w]
+        faceCrop = cv2.resize(faceCrop, (350, 350))
+    faceDict["face%s" %(len(faceDict)+1)] = faceCrop
+    return faceCrop
+
+def faceRecognize():
+	dirPath = os.path.dirname(os.path.realpath(__file__))
+	masmPath = os.path.dirname(dirPath)
+	res = subprocess.check_output(["python", masmPath + "/scripts/_NSE_live.py"], shell=True).decode('utf-8')
+	print("Received {}".format(res))
+	if "YES" in res:
+		return True
+	else:
+		return False
+
+def Update():
+	# Message received, start recognizing
+	if socketer.hasData("recognizeFace"):
+		print("Recognizing..")
+		res = faceRecognize()
+		if res != None:
+			if res == True:
+				socketer.sendData("seeYou") # recognized player
+			else:
+				socketer.sendData("cantSee") # failed to recognize
+
+'''
 import os
 import socket
-import numpy.core.multiarray
 import cv2
 import facer
 import pathlib
@@ -122,3 +161,4 @@ def Update():
 			elif res == False:
 				socketer.sendData("cantSee") # failed to recognize
 				recognizing = False
+'''

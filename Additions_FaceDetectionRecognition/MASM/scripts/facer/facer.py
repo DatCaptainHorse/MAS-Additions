@@ -4,8 +4,8 @@
 
 import os
 import time
-import cv2
 import numpy as np
+import cv2
 
 face_recognizer_lbph = None
 face_recognizer_dnn = None

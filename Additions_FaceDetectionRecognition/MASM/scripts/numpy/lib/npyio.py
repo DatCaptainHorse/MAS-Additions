@@ -1,9 +1,9 @@
 from __future__ import division, absolute_import, print_function
 
-import io
 import sys
 import os
 import re
+import functools
 import itertools
 import warnings
 import weakref
@@ -12,7 +12,10 @@ from operator import itemgetter, index as opindex
 import numpy as np
 from . import format
 from ._datasource import DataSource
+from numpy.core import overrides
 from numpy.core.multiarray import packbits, unpackbits
+from numpy.core.overrides import set_module
+from numpy.core._internal import recursive
 from ._iotools import (
     LineSplitter, NameValidator, StringConverter, ConverterError,
     ConverterLockError, ConversionWarning, _is_string_like,
@@ -21,18 +24,18 @@ from ._iotools import (
 
 from numpy.compat import (
     asbytes, asstr, asunicode, asbytes_nested, bytes, basestring, unicode,
-    is_pathlib_path
+    os_fspath, os_PathLike
     )
+from numpy.core.numeric import pickle
 
 if sys.version_info[0] >= 3:
-    import pickle
     from collections.abc import Mapping
 else:
-    import cPickle as pickle
     from future_builtins import map
     from collections import Mapping
 
 
+@set_module('numpy')
 def loads(*args, **kwargs):
     # NumPy 1.15.0, 2017-12-10
     warnings.warn(
@@ -46,6 +49,10 @@ __all__ = [
     'recfromtxt', 'recfromcsv', 'load', 'loads', 'save', 'savez',
     'savez_compressed', 'packbits', 'unpackbits', 'fromregex', 'DataSource'
     ]
+
+
+array_function_dispatch = functools.partial(
+    overrides.array_function_dispatch, module='numpy')
 
 
 class BagObj(object):
@@ -105,8 +112,8 @@ def zipfile_factory(file, *args, **kwargs):
     pathlib.Path objects. `args` and `kwargs` are passed to the zipfile.ZipFile
     constructor.
     """
-    if is_pathlib_path(file):
-        file = str(file)
+    if not hasattr(file, 'read'):
+        file = os_fspath(file)
     import zipfile
     kwargs['allowZip64'] = True
     return zipfile.ZipFile(file, *args, **kwargs)
@@ -139,7 +146,11 @@ class NpzFile(Mapping):
         An object on which attribute can be performed as an alternative
         to getitem access on the `NpzFile` instance itself.
     allow_pickle : bool, optional
-        Allow loading pickled data. Default: True
+        Allow loading pickled data. Default: False
+
+        .. versionchanged:: 1.16.3
+            Made default False in response to CVE-2019-6446.
+
     pickle_kwargs : dict, optional
         Additional keyword arguments to pass on to pickle.load.
         These are only useful when loading object arrays saved on
@@ -175,7 +186,7 @@ class NpzFile(Mapping):
 
     """
 
-    def __init__(self, fid, own_fid=False, allow_pickle=True,
+    def __init__(self, fid, own_fid=False, allow_pickle=False,
                  pickle_kwargs=None):
         # Import is postponed to here since zipfile depends on gzip, an
         # optional component of the so-called standard library.
@@ -277,7 +288,8 @@ class NpzFile(Mapping):
             return self.keys()
 
 
-def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
+@set_module('numpy')
+def load(file, mmap_mode=None, allow_pickle=False, fix_imports=True,
          encoding='ASCII'):
     """
     Load arrays or pickled objects from ``.npy``, ``.npz`` or pickled files.
@@ -299,8 +311,11 @@ def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
         Allow loading pickled object arrays stored in npy files. Reasons for
         disallowing pickles include security, as loading pickled data can
         execute arbitrary code. If pickles are disallowed, loading object
-        arrays will fail.
-        Default: True
+        arrays will fail. Default: False
+
+        .. versionchanged:: 1.16.3
+            Made default False in response to CVE-2019-6446.
+
     fix_imports : bool, optional
         Only useful when loading Python 2 generated pickled files on Python 3,
         which includes npy/npz files containing object arrays. If `fix_imports`
@@ -379,16 +394,6 @@ def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
     memmap([4, 5, 6])
 
     """
-    own_fid = False
-    if isinstance(file, basestring):
-        fid = open(file, "rb")
-        own_fid = True
-    elif is_pathlib_path(file):
-        fid = file.open("rb")
-        own_fid = True
-    else:
-        fid = file
-
     if encoding not in ('ASCII', 'latin1', 'bytes'):
         # The 'encoding' value for pickle also affects what encoding
         # the serialized binary data of NumPy arrays is loaded
@@ -409,21 +414,30 @@ def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
         # Nothing to do on Python 2
         pickle_kwargs = {}
 
+    # TODO: Use contextlib.ExitStack once we drop Python 2
+    if hasattr(file, 'read'):
+        fid = file
+        own_fid = False
+    else:
+        fid = open(os_fspath(file), "rb")
+        own_fid = True
+
     try:
         # Code to distinguish from NumPy binary files and pickles.
         _ZIP_PREFIX = b'PK\x03\x04'
+        _ZIP_SUFFIX = b'PK\x05\x06' # empty zip files start with this
         N = len(format.MAGIC_PREFIX)
         magic = fid.read(N)
         # If the file size is less than N, we need to make sure not
         # to seek past the beginning of the file
         fid.seek(-min(N, len(magic)), 1)  # back-up
-        if magic.startswith(_ZIP_PREFIX):
+        if magic.startswith(_ZIP_PREFIX) or magic.startswith(_ZIP_SUFFIX):
             # zip-file (assume .npz)
             # Transfer file ownership to NpzFile
-            tmp = own_fid
+            ret = NpzFile(fid, own_fid=own_fid, allow_pickle=allow_pickle,
+                          pickle_kwargs=pickle_kwargs)
             own_fid = False
-            return NpzFile(fid, own_fid=tmp, allow_pickle=allow_pickle,
-                           pickle_kwargs=pickle_kwargs)
+            return ret
         elif magic == format.MAGIC_PREFIX:
             # .npy file
             if mmap_mode:
@@ -434,8 +448,8 @@ def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
         else:
             # Try a pickle
             if not allow_pickle:
-                raise ValueError("allow_pickle=False, but file does not contain "
-                                 "non-pickled data")
+                raise ValueError("Cannot load file containing pickled data "
+                                 "when allow_pickle=False")
             try:
                 return pickle.load(fid, **pickle_kwargs)
             except Exception:
@@ -446,6 +460,11 @@ def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
             fid.close()
 
 
+def _save_dispatcher(file, arr, allow_pickle=None, fix_imports=None):
+    return (arr,)
+
+
+@array_function_dispatch(_save_dispatcher)
 def save(file, arr, allow_pickle=True, fix_imports=True):
     """
     Save an array to a binary file in NumPy ``.npy`` format.
@@ -496,18 +515,14 @@ def save(file, arr, allow_pickle=True, fix_imports=True):
 
     """
     own_fid = False
-    if isinstance(file, basestring):
+    if hasattr(file, 'read'):
+        fid = file
+    else:
+        file = os_fspath(file)
         if not file.endswith('.npy'):
             file = file + '.npy'
         fid = open(file, "wb")
         own_fid = True
-    elif is_pathlib_path(file):
-        if not file.name.endswith('.npy'):
-            file = file.parent / (file.name + '.npy')
-        fid = file.open("wb")
-        own_fid = True
-    else:
-        fid = file
 
     if sys.version_info[0] >= 3:
         pickle_kwargs = dict(fix_imports=fix_imports)
@@ -524,6 +539,14 @@ def save(file, arr, allow_pickle=True, fix_imports=True):
             fid.close()
 
 
+def _savez_dispatcher(file, *args, **kwds):
+    for a in args:
+        yield a
+    for v in kwds.values():
+        yield v
+
+
+@array_function_dispatch(_savez_dispatcher)
 def savez(file, *args, **kwds):
     """
     Save several arrays into a single file in uncompressed ``.npz`` format.
@@ -603,6 +626,14 @@ def savez(file, *args, **kwds):
     _savez(file, args, kwds, False)
 
 
+def _savez_compressed_dispatcher(file, *args, **kwds):
+    for a in args:
+        yield a
+    for v in kwds.values():
+        yield v
+
+
+@array_function_dispatch(_savez_compressed_dispatcher)
 def savez_compressed(file, *args, **kwds):
     """
     Save several arrays into a single file in compressed ``.npz`` format.
@@ -672,12 +703,10 @@ def _savez(file, args, kwds, compress, allow_pickle=True, pickle_kwargs=None):
     # component of the so-called standard library.
     import zipfile
 
-    if isinstance(file, basestring):
+    if not hasattr(file, 'read'):
+        file = os_fspath(file)
         if not file.endswith('.npz'):
             file = file + '.npz'
-    elif is_pathlib_path(file):
-        if not file.name.endswith('.npz'):
-            file = file.parent / (file.name + '.npz')
 
     namedict = kwds
     for i, val in enumerate(args):
@@ -770,9 +799,11 @@ def _getconv(dtype):
 # amount of lines loadtxt reads in one chunk, can be overridden for testing
 _loadtxt_chunksize = 50000
 
+
+@set_module('numpy')
 def loadtxt(fname, dtype=float, comments='#', delimiter=None,
             converters=None, skiprows=0, usecols=None, unpack=False,
-            ndmin=0, encoding='bytes'):
+            ndmin=0, encoding='bytes', max_rows=None):
     """
     Load data from a text file.
 
@@ -834,6 +865,11 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
         the system default is used. The default value is 'bytes'.
 
         .. versionadded:: 1.14.0
+    max_rows : int, optional
+        Read `max_rows` lines of content after `skiprows` lines. The default
+        is to read all the lines.
+
+        .. versionadded:: 1.16.0
 
     Returns
     -------
@@ -920,8 +956,8 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
 
     fown = False
     try:
-        if is_pathlib_path(fname):
-            fname = str(fname)
+        if isinstance(fname, os_PathLike):
+            fname = os_fspath(fname)
         if _is_string_like(fname):
             fh = np.lib._datasource.open(fname, 'rt', encoding=encoding)
             fencoding = getattr(fh, 'encoding', 'latin1')
@@ -943,7 +979,8 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
         fencoding = locale.getpreferredencoding()
 
     # not to be confused with the flatten_dtype we import...
-    def flatten_dtype_internal(dt):
+    @recursive
+    def flatten_dtype_internal(self, dt):
         """Unpack a structured data-type, and produce re-packing info."""
         if dt.names is None:
             # If the dtype is flattened, return.
@@ -963,7 +1000,7 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
             packing = []
             for field in dt.names:
                 tp, bytes = dt.fields[field]
-                flat_dt, flat_packing = flatten_dtype_internal(tp)
+                flat_dt, flat_packing = self(tp)
                 types.extend(flat_dt)
                 # Avoid extra nesting for subarrays
                 if tp.ndim > 0:
@@ -972,7 +1009,8 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
                     packing.append((len(flat_dt), flat_packing))
             return (types, packing)
 
-    def pack_items(items, packing):
+    @recursive
+    def pack_items(self, items, packing):
         """Pack items into nested lists based on re-packing info."""
         if packing is None:
             return items[0]
@@ -984,7 +1022,7 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
             start = 0
             ret = []
             for length, subpacking in packing:
-                ret.append(pack_items(items[start:start+length], subpacking))
+                ret.append(self(items[start:start+length], subpacking))
                 start += length
             return tuple(ret)
 
@@ -1013,7 +1051,9 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
 
         """
         X = []
-        for i, line in enumerate(itertools.chain([first_line], fh)):
+        line_iter = itertools.chain([first_line], fh)
+        line_iter = itertools.islice(line_iter, max_rows)
+        for i, line in enumerate(line_iter):
             vals = split_line(line)
             if len(vals) == 0:
                 continue
@@ -1110,11 +1150,6 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
     finally:
         if fown:
             fh.close()
-        # recursive closures have a cyclic reference to themselves, which
-        # requires gc to collect (gh-10620). To avoid this problem, for
-        # performance and PyPy friendliness, we break the cycle:
-        flatten_dtype_internal = None
-        pack_items = None
 
     if X is None:
         X = np.array([], dtype)
@@ -1149,6 +1184,13 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
         return X
 
 
+def _savetxt_dispatcher(fname, X, fmt=None, delimiter=None, newline=None,
+                        header=None, footer=None, comments=None,
+                        encoding=None):
+    return (X,)
+
+
+@array_function_dispatch(_savetxt_dispatcher)
 def savetxt(fname, X, fmt='%.18e', delimiter=' ', newline='\n', header='',
             footer='', comments='# ', encoding=None):
     """
@@ -1259,8 +1301,8 @@ def savetxt(fname, X, fmt='%.18e', delimiter=' ', newline='\n', header='',
     References
     ----------
     .. [1] `Format Specification Mini-Language
-           <http://docs.python.org/library/string.html#
-           format-specification-mini-language>`_, Python Documentation.
+           <https://docs.python.org/library/string.html#format-specification-mini-language>`_,
+           Python Documentation.
 
     Examples
     --------
@@ -1310,8 +1352,8 @@ def savetxt(fname, X, fmt='%.18e', delimiter=' ', newline='\n', header='',
                 self.write = self.write_bytes
 
     own_fh = False
-    if is_pathlib_path(fname):
-        fname = str(fname)
+    if isinstance(fname, os_PathLike):
+        fname = os_fspath(fname)
     if _is_string_like(fname):
         # datasource doesn't support creating a new file ...
         open(fname, 'wt').close()
@@ -1341,7 +1383,7 @@ def savetxt(fname, X, fmt='%.18e', delimiter=' ', newline='\n', header='',
 
             # Complex dtype -- each field indicates a separate column
             else:
-                ncol = len(X.dtype.descr)
+                ncol = len(X.dtype.names)
         else:
             ncol = X.shape[1]
 
@@ -1399,6 +1441,7 @@ def savetxt(fname, X, fmt='%.18e', delimiter=' ', newline='\n', header='',
             fh.close()
 
 
+@set_module('numpy')
 def fromregex(file, regexp, dtype, encoding=None):
     """
     Construct an array from a text file, using regular expression parsing.
@@ -1497,6 +1540,7 @@ def fromregex(file, regexp, dtype, encoding=None):
 #####--------------------------------------------------------------------------
 
 
+@set_module('numpy')
 def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
                skip_header=0, skip_footer=0, converters=None,
                missing_values=None, filling_values=None, usecols=None,
@@ -1624,7 +1668,7 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
     References
     ----------
     .. [1] NumPy User Guide, section `I/O with NumPy
-           <http://docs.scipy.org/doc/numpy/user/basics.io.genfromtxt.html>`_.
+           <https://docs.scipy.org/doc/numpy/user/basics.io.genfromtxt.html>`_.
 
     Examples
     ---------
@@ -1694,8 +1738,8 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
     # Initialize the filehandle, the LineSplitter and the NameValidator
     own_fhd = False
     try:
-        if is_pathlib_path(fname):
-            fname = str(fname)
+        if isinstance(fname, os_PathLike):
+            fname = os_fspath(fname)
         if isinstance(fname, basestring):
             fhd = iter(np.lib._datasource.open(fname, 'rt', encoding=encoding))
             own_fhd = True
@@ -2089,10 +2133,10 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
 
         if names is None:
             # If the dtype is uniform (before sizing strings)
-            base = set([
+            base = {
                 c_type
                 for c, c_type in zip(converters, column_types)
-                if c._checked])
+                if c._checked}
             if len(base) == 1:
                 uniform_type, = base
                 (ddtype, mdtype) = (uniform_type, bool)

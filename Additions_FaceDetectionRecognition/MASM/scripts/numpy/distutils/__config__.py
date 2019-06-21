@@ -13,13 +13,10 @@ if sys.platform == 'win32' and os.path.isdir(extra_dll_dir):
     os.environ.setdefault('PATH', '')
     os.environ['PATH'] += os.pathsep + extra_dll_dir
 
-blas_mkl_info={}
-blis_info={}
-openblas_info={'library_dirs': ['C:\\projects\\numpy-wheels\\numpy\\build\\openblas'], 'libraries': ['openblas'], 'language': 'f77', 'define_macros': [('HAVE_CBLAS', None)]}
-blas_opt_info={'library_dirs': ['C:\\projects\\numpy-wheels\\numpy\\build\\openblas'], 'libraries': ['openblas'], 'language': 'f77', 'define_macros': [('HAVE_CBLAS', None)]}
-lapack_mkl_info={}
-openblas_lapack_info={'library_dirs': ['C:\\projects\\numpy-wheels\\numpy\\build\\openblas'], 'libraries': ['openblas'], 'language': 'f77', 'define_macros': [('HAVE_CBLAS', None)]}
-lapack_opt_info={'library_dirs': ['C:\\projects\\numpy-wheels\\numpy\\build\\openblas'], 'libraries': ['openblas'], 'language': 'f77', 'define_macros': [('HAVE_CBLAS', None)]}
+blas_mkl_info={'libraries': ['mkl_lapack95_lp64', 'mkl_blas95_lp64', 'mkl_rt'], 'library_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win'], 'define_macros': [('SCIPY_MKL_H', None), ('HAVE_CBLAS', None)], 'include_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include']}
+blas_opt_info={'libraries': ['mkl_lapack95_lp64', 'mkl_blas95_lp64', 'mkl_rt'], 'library_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win'], 'define_macros': [('SCIPY_MKL_H', None), ('HAVE_CBLAS', None)], 'include_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include']}
+lapack_mkl_info={'libraries': ['mkl_lapack95_lp64', 'mkl_blas95_lp64', 'mkl_rt'], 'library_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win'], 'define_macros': [('SCIPY_MKL_H', None), ('HAVE_CBLAS', None)], 'include_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include']}
+lapack_opt_info={'libraries': ['mkl_lapack95_lp64', 'mkl_blas95_lp64', 'mkl_rt'], 'library_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win'], 'define_macros': [('SCIPY_MKL_H', None), ('HAVE_CBLAS', None)], 'include_dirs': ['C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include']}
 
 def get_info(name):
     g = globals()
