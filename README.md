@@ -29,7 +29,7 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 2. Copy "zz_additions_MASM_communicator.rpy" file and "MASM" folder into DDLC game folder.
 
-3. Copy "MASM.exe" file from MASM_Binaries folder into "MASM" folder in the DDLC game folder.
+3. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "MASM" folder in the DDLC game folder.
 
 
 ## Installing - FaceDetectionRecognition
