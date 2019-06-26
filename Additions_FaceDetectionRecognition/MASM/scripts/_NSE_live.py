@@ -9,25 +9,29 @@ cap = cv2.VideoCapture(0)
 
 dirPath = os.path.dirname(os.path.realpath(__file__))
 realPath = os.path.dirname(dirPath)
-faceCascade = cv2.CascadeClassifier(realPath + "/haarcascade_frontalface_default.xml")
+faceCascade = cv2.CascadeClassifier(realPath + "/haarcascade_frontalface_alt.xml")
 
 while(True):
 	ret, frame = cap.read()
+	if not ret:
+		break
+
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+	gray = cv2.equalizeHist(gray)
 
 	faces = faceCascade.detectMultiScale(
 		gray,
-		scaleFactor=1.1,
-		minNeighbors=5,
-		minSize=(30, 30)
+		scaleFactor=1.2,
+		minNeighbors=3,
+		minSize=(20, 20)
 	)
 
-	# Draw a rectangle around the faces
 	if len(faces) >= 1:
 		recog = True
 		break
 		
-	if (time.time() - start) > 5:
+	# 8 seconds oughta be enough
+	if (time.time() - start) > 8:
 		recog = False
 		break
 		

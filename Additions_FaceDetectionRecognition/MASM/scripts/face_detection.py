@@ -6,16 +6,6 @@ import subprocess
 import socket
 import socketer
 
-faceDict = {}
-moods = ["neutral", "sad", "happy", "anger"]
-
-def cropFace(img, face):
-    for (x, y, w, h) in face:
-        faceCrop = img[y:y+h, x:x+w]
-        faceCrop = cv2.resize(faceCrop, (350, 350))
-    faceDict["face%s" %(len(faceDict)+1)] = faceCrop
-    return faceCrop
-
 def faceRecognize():
 	dirPath = os.path.dirname(os.path.realpath(__file__))
 	masmPath = os.path.dirname(dirPath)

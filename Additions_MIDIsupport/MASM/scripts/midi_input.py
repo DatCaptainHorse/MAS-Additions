@@ -1,4 +1,3 @@
-import singularityengine as SE
 import mido
 import socketer
 

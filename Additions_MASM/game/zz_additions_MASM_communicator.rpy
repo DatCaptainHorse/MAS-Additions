@@ -1,6 +1,6 @@
 init 4 python:
     #config.log = "debuglog.txt"
-    registerAddition("MASMC", "MASM Communicator", "0.1.5")
+    registerAddition("MASMC", "MASM Communicator", "0.1.6")
     import signal
     import socket
     import select
@@ -16,6 +16,7 @@ init 4 python:
             client = None
             masmApp = None
             appPath = None
+            appExists = False
 
             def __init__(self):
                 self.server = socket.socket()
@@ -41,7 +42,6 @@ init 4 python:
 
             def communicateWithClient(self):
                 while True:
-                    # TODO: poll app state
                     received = None
                     try:
                         rtr, rtw, err = select.select((MASM_Communicator.client,), (), (), 0)
@@ -56,6 +56,13 @@ init 4 python:
                         #renpy.log("MASMC received data: {}".format(received))
                         MASM_Communicator.data.append(received)
 
+                    if MASM_Communicator.masmApp is not None:
+                        poll = MASM_Communicator.masmApp.poll()
+                        if poll == None:
+                            MASM_Communicator.appExists = True
+                        else:
+                            MASM_Communicator.appExists = False
+
                     time.sleep(0.1) # Ease up a little
                     
             @staticmethod
@@ -65,6 +72,10 @@ init 4 python:
                     return True
                 else:
                     return False
+
+            @staticmethod
+            def canUse():
+                return MASM_Communicator.appExists
 
             @staticmethod
             def clientSend(toSend):
@@ -89,7 +100,10 @@ init 4 python:
                     if renpy.windows: # If we are running on Windows OS
                         MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/MASM/MASM.exe'))) # Open MASM application subprocess
                     elif renpy.linux or renpy.macintosh: # Linux / Mac..
-                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/MASM/MASM.sh'))) # Good luck!
+                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/MASM/MASM'))) # Good luck!
+
+                    if MASM_Communicator.masmApp is not None:
+                        MASM_Communicator.appExists = True
 
                 atexit.register(MASM_Communicator.exiting) # Because subprocesses
                 signal.signal(signal.SIGTERM, MASM_Communicator.exiting)

@@ -18,7 +18,7 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 
 ## Installing - Core
-1. Copy "python-packages", "screens.rpy" and "zz_additions.rpy" files into DDLC game folder.
+1. Copy "python-packages", "screens.rpyc" and "zz_additions.rpyc" files into DDLC game folder.
 
 
 ## Installing - MASM
@@ -27,7 +27,7 @@ https://github.com/Monika-After-Story/MonikaModDev
 1. [Download and Install Python 3.8 for 64-bit](https://www.python.org/downloads/release/python-380b1/) on your system, remember to add it to PATH during installation!
 ![Install to Path](https://datatofish.com/wp-content/uploads/2018/10/0001_add_Python_to_Path.png)
 
-2. Copy "zz_additions_MASM_communicator.rpy" file and "MASM" folder into DDLC game folder.
+2. Copy "zz_additions_MASM_communicator.rpyc" file and "MASM" folder into DDLC game folder.
 
 3. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "MASM" folder in the DDLC game folder.
 
@@ -35,10 +35,10 @@ https://github.com/Monika-After-Story/MonikaModDev
 ## Installing - FaceDetectionRecognition
 **Requires: Core, MASM**
 
-1. Copy "zz_additions_face_detection.rpy" file and "MASM" folder into DDLC game folder.
+1. Copy "zz_additions_face_detection.rpyc" file and "MASM" folder into DDLC game folder.
 
 
-## Installing - MIDI: **Not yet updated**
+## Installing - MIDI: **Unable to update until 3.8 packages are ready**
 
 
 # Reporting bugs and issues
