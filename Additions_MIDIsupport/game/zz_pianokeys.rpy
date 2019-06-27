@@ -2868,7 +2868,8 @@ init 810 python:
             self._button_cancel.disable()
             self._button_reset.disable()
 
-            self.STARTEDMIDITHREAD = False
+            self.MIDIThreadRun = False
+            self.mthr = None
 
             # integer to handle redraw calls.
             # NOTE: when we want to redraw, we add to this value. Render
@@ -3171,6 +3172,9 @@ init 810 python:
             is_prac = False
             end_label = None
             completed_pnms = 0
+            
+            self.MIDIThreadRun = False
+            self.mthr.join()
 
             if not self.note_hit:
                 end_label = "mas_piano_result_none"
@@ -3897,7 +3901,7 @@ init 810 python:
             return r
 
         def midiCallback(self):
-            while True:
+            while self.MIDIThreadRun:
                 if len(MASM_Communicator.data) > 0:
                     for dat in MASM_Communicator.data:
                         if dat.startswith('note'):
@@ -3921,6 +3925,18 @@ init 810 python:
                                     self.note_hit = True
                                     self.played.append(key)
 
+                                    if self.state == self.STATE_LISTEN:
+                                        self.stateListen(pygame.KEYDOWN, key)
+
+                                    elif self.state in self.POST_STATES:
+                                        self.statePost(pygame.KEYDOWN, key)
+
+                                    elif self.state in self.TRANS_POST_STATES:
+                                        self.stateWaitPost(pygame.KEYDOWN, key)
+
+                                    elif self.state in self.MATCH_STATES:
+                                        self.stateMatch(pygame.KEYDOWN, key)
+
                                     renpy.play(self.pkeys[key], channel="audio")
                                     renpy.redraw(self, 0)
 
@@ -3939,11 +3955,11 @@ init 810 python:
             if self.state in self.FINAL_DONE_STATES:
                 return self.quitflow()
 
-            if not self.STARTEDMIDITHREAD:
-                mthr = threading.Thread(target = self.midiCallback)
-                mthr.setDaemon(True)
-                mthr.start()
-                self.STARTEDMIDITHREAD = True
+            if not self.MIDIThreadRun:
+                self.MIDIThreadRun = True
+                self.mthr = threading.Thread(target = self.midiCallback)
+                self.mthr.setDaemon(True)
+                self.mthr.start()
 
             # all mouse events
             if ev.type in self.MOUSE_EVENTS:
