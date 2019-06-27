@@ -20,20 +20,20 @@ def connectMAS():
 	if client == None:
 		SE.Log("\nConnecting to MAS..")
 	
-		client = socket.socket()
+		client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		client.bind(("127.0.0.1", 23456))
 		#client.setblocking(False)
-		client.settimeout(0.1)
+		client.settimeout(0.01)
 
-		host = socket.gethostname()
-		port = 12345
-
+		#host = socket.gethostname() # TCP
+		''' # TCP
 		while True:
 			try:
 				client.connect((host, port))
 			except socket.error: # Wait for connection
 				continue
 			break
-			
+		'''
 		SE.Log("Connected!\n")
 		execs = 0
 
@@ -41,31 +41,26 @@ def receiveData():
 	global client
 	global data
 	global execs
-	
 	if client != None:
-		if execs >= 5:
-			SE.Log("Too many exceptions, attempting to reconnect..")
-			client.close()
-			client = None
-			connectMAS()
-
 		try:
-			dat = client.recv(64).decode('utf-8')
+			dat, addr = client.recvfrom(64)
 			if dat != None:
+				dat = dat.decode('utf-8')
+				SE.Log("received: {}".format(dat))
 				data.append(dat)
-		except socket.timeout: # No data
+		except socket.error: # No data
 			pass
 		
 		if hasData("first"):
 			SE.Log("\nWhats this? How interesting..\n")
-			
+
 def sendData(toSend):
 	global client
 	if client != None:
-		client.sendall(toSend.encode('utf-8'))
+		client.sendto(toSend.encode('utf-8'), ("127.0.0.1", 12345))
 			
 def Start():
 	connectMAS()
 
-def Update():
+def Render():
 	receiveData()

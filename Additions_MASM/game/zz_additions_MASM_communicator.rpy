@@ -1,5 +1,5 @@
 init 4 python:
-    #config.log = "debuglog.txt"
+    config.log = "debuglog.txt"
     registerAddition("MASMC", "MASM Communicator", "0.1.6")
     import signal
     import socket
@@ -13,21 +13,17 @@ init 4 python:
         # Threaded socket communicator
         class MASM_Communicator:
             data = []
-            client = None
+            server = None
             masmApp = None
             appPath = None
             appExists = False
 
             def __init__(self):
-                self.server = socket.socket()
-                self.server.settimeout(0.1)
-                self.port = 12345
-                self.host = socket.gethostname()
-                self.server.bind((self.host, self.port))
                 self.clientAddr = None
                 self.thread = None
 
             def connectMASM(self):
+                ''' # TCP
                 self.server.listen(5)
                 while True:
                     try:
@@ -35,6 +31,10 @@ init 4 python:
                     except socket.error:
                         continue
                     break
+                '''
+                MASM_Communicator.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                MASM_Communicator.server.settimeout(0.01)
+                MASM_Communicator.server.bind(("127.0.0.1", 12345))
 
                 self.thread = threading.Thread(target = self.communicateWithClient)
                 self.thread.setDaemon(True)
@@ -44,16 +44,17 @@ init 4 python:
                 while True:
                     received = None
                     try:
-                        rtr, rtw, err = select.select((MASM_Communicator.client,), (), (), 0)
-                        if rtr:
-                            received = MASM_Communicator.client.recv(64).decode('utf-8')
-                            if len(received) == 0:
-                                break
+                        #rtr, rtw, err = select.select((MASM_Communicator.client,), (), (), 0)
+                        #if rtr:
+                        received, addr = self.server.recvfrom(64)
+                        if len(received) == 0:
+                            received = received.decode('utf-8')
+                            break
                     except socket.error: # No data
                         pass
 
                     if received is not None:
-                        #renpy.log("MASMC received data: {}".format(received))
+                        renpy.log("MASMC received data: {}".format(received))
                         MASM_Communicator.data.append(received)
 
                     if MASM_Communicator.masmApp is not None:
@@ -63,7 +64,7 @@ init 4 python:
                         else:
                             MASM_Communicator.appExists = False
 
-                    time.sleep(0.1) # Ease up a little
+                    time.sleep(0.001) # ease up tiny bit
                     
             @staticmethod
             def hasData(dat):
@@ -79,8 +80,8 @@ init 4 python:
 
             @staticmethod
             def clientSend(toSend):
-                if MASM_Communicator.client is not None:
-                    MASM_Communicator.client.sendall(toSend.encode('utf-8'))
+                if MASM_Communicator.server is not None:
+                    MASM_Communicator.server.sendto(toSend.encode('utf-8'), ("127.0.0.1", 23456))
 
             @staticmethod
             def exiting():
