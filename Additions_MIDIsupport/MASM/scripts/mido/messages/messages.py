@@ -62,7 +62,7 @@ class BaseMessage(object):
     def __delattr__(self, name):
         raise AttributeError('attribute cannot be deleted')
 
-    def __setattr__(self, name):
+    def __setattr__(self, name, value):
         raise AttributeError('message is immutable')
 
     def __eq__(self, other):
@@ -103,6 +103,9 @@ class Message(BaseMessage):
 
         if 'type' in overrides and overrides['type'] != self.type:
             raise ValueError('copy must be same message type')
+
+        if 'data' in overrides:
+            overrides['data'] = bytearray(overrides['data'])
 
         msgdict = vars(self).copy()
         msgdict.update(overrides)
@@ -166,8 +169,9 @@ class Message(BaseMessage):
         if name == 'type':
             raise AttributeError('type attribute is read only')
         elif name not in vars(self):
-            raise AttributeError(
-                        '{} message has no attribute {}'.format(self.type, name))
+            raise AttributeError('{} message has no '
+                                 'attribute {}'.format(self.type,
+                                                       name))
         else:
             check_value(name, value)
             if name == 'data':

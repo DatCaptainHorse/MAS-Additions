@@ -37,9 +37,10 @@ DEFAULT_TICKS_PER_BEAT = 480
 # Maximum message length to attempt to read.
 MAX_MESSAGE_LENGTH = 1000000
 
+
 def print_byte(byte, pos=0):
     char = chr(byte)
-    if char.isspace() or not char in string.printable:
+    if char.isspace() or char not in string.printable:
         char = '.'
 
     print('  {:06x}: {:02x}  {}'.format(pos, byte, char))
@@ -90,7 +91,7 @@ def _dbg(text=''):
 # 1. we may have mixed big and little endian chunk sizes. (RIFF is
 # little endian while MTrk is big endian.)
 #
-# 2. the chunk module assumes that chunks are padded to the neares
+# 2. the chunk module assumes that chunks are padded to the nearest
 # multiple of 2. This is not true of MIDI files.
 
 def read_chunk_header(infile):
@@ -98,7 +99,7 @@ def read_chunk_header(infile):
     if len(header) < 8:
         raise EOFError
 
-    # Todo: check for b'RIFF' and switch endian?
+    # TODO: check for b'RIFF' and switch endian?
 
     return struct.unpack('>4sL', header)
 
@@ -117,19 +118,22 @@ def read_file_header(infile):
         return struct.unpack('>hhh', data[:6])
 
 
-def read_message(infile, status_byte, peek_data, delta):
+def read_message(infile, status_byte, peek_data, delta, clip=False):
     try:
         spec = SPEC_BY_STATUS[status_byte]
     except LookupError:
         raise IOError('undefined status byte 0x{:02x}'.format(status_byte))
 
-    # Subtrac 1 for status byte.
+    # Subtract 1 for status byte.
     size = spec['length'] - 1 - len(peek_data)
     data_bytes = peek_data + read_bytes(infile, size)
 
-    for byte in data_bytes:
-        if byte > 127:
-            raise IOError('data byte must be in range 0..127')
+    if clip:
+        data_bytes = [byte if byte < 127 else 127 for byte in data_bytes]
+    else:
+        for byte in data_bytes:
+            if byte > 127:
+                raise IOError('data byte must be in range 0..127')
 
     return Message.from_bytes([status_byte] + data_bytes, time=delta)
 
@@ -139,7 +143,7 @@ def read_sysex(infile, delta):
     data = read_bytes(infile, length)
 
     # Strip start and end bytes.
-    # Todo: is this necessary?
+    # TODO: is this necessary?
     if data and data[0] == 0xf0:
         data = data[1:]
     if data and data[-1] == 0xf7:
@@ -159,13 +163,13 @@ def read_variable_int(infile):
 
 
 def read_meta_message(infile, delta):
-    type = read_byte(infile)
+    meta_type = read_byte(infile)
     length = read_variable_int(infile)
     data = read_bytes(infile, length)
-    return build_meta_message(type, data, delta)
+    return build_meta_message(meta_type, data, delta)
 
 
-def read_track(infile, debug=False):
+def read_track(infile, debug=False, clip=False):
     track = MidiTrack()
 
     name, size = read_chunk_header(infile)
@@ -193,7 +197,6 @@ def read_track(infile, debug=False):
         if debug:
             _dbg('-> delta={}'.format(delta))
 
-        # Todo: not all messages have running status
         status_byte = read_byte(infile)
 
         if status_byte < 0x80:
@@ -210,11 +213,11 @@ def read_track(infile, debug=False):
         if status_byte == 0xff:
             msg = read_meta_message(infile, delta)
         elif status_byte in [0xf0, 0xf7]:
-            # Todo: I'm not quite clear on the difference between
+            # TODO: I'm not quite clear on the difference between
             # f0 and f7 events.
             msg = read_sysex(infile, delta)
         else:
-            msg = read_message(infile, status_byte, peek_data, delta)
+            msg = read_message(infile, status_byte, peek_data, delta, clip)
 
         track.append(msg)
 
@@ -246,22 +249,30 @@ def write_track(outfile, track):
             raise ValueError('realtime messages are not allowed in MIDI files')
 
         data.extend(encode_variable_int(msg.time))
-        if msg.type == 'sysex':
+
+        if msg.is_meta:
+            data.extend(msg.bytes())
             running_status_byte = None
+        elif msg.type == 'sysex':
             data.append(0xf0)
             # length (+ 1 for end byte (0xf7))
             data.extend(encode_variable_int(len(msg.data) + 1))
             data.extend(msg.data)
             data.append(0xf7)
+            running_status_byte = None
         else:
-            raw = msg.bytes()
-            if (not msg.is_meta
-                and raw[0] < 0xf0
-                and raw[0] == running_status_byte):
-                data.extend(raw[1:])
+            msg_bytes = msg.bytes()
+            status_byte = msg_bytes[0]
+
+            if status_byte == running_status_byte:
+                data.extend(msg_bytes[1:])
             else:
-                data.extend(raw)
-            running_status_byte = raw[0]
+                data.extend(msg_bytes)
+
+            if status_byte < 0xf0:
+                running_status_byte = status_byte
+            else:
+                running_status_byte = None
 
     write_chunk(outfile, b'MTrk', data)
 
@@ -281,13 +292,16 @@ class MidiFile(object):
     def __init__(self, filename=None, file=None,
                  type=1, ticks_per_beat=DEFAULT_TICKS_PER_BEAT,
                  charset='latin1',
-                 debug=False):
+                 debug=False,
+                 clip=False
+                 ):
 
         self.filename = filename
         self.type = type
         self.ticks_per_beat = ticks_per_beat
         self.charset = charset
         self.debug = debug
+        self.clip = clip
 
         self.tracks = []
 
@@ -334,8 +348,10 @@ class MidiFile(object):
                 if self.debug:
                     _dbg('Track {}:'.format(i))
 
-                self.tracks.append(read_track(infile, debug=self.debug))
-                # Todo: used to ignore EOFError. I hope things still work.
+                self.tracks.append(read_track(infile,
+                                              debug=self.debug,
+                                              clip=self.clip))
+                # TODO: used to ignore EOFError. I hope things still work.
 
     @property
     def length(self):
@@ -398,8 +414,8 @@ class MidiFile(object):
     def save(self, filename=None, file=None):
         """Save to a file.
 
-        If file is passed the data will be saved to that file. This is typically
-        an in-memory file or and already open file like sys.stdout.
+        If file is passed the data will be saved to that file. This is
+        typically an in-memory file or and already open file like sys.stdout.
 
         If filename is passed the data will be saved to that file.
 
@@ -449,7 +465,6 @@ class MidiFile(object):
         return '<midi file {!r} type {}, {} tracks, {} messages>'.format(
             self.filename, self.type, len(self.tracks),
             sum([len(track) for track in self.tracks]))
-
 
     # The context manager has no purpose but is kept around since it was
     # used in examples in the past.

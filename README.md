@@ -38,8 +38,10 @@ https://github.com/Monika-After-Story/MonikaModDev
 1. Copy "zz_additions_face_detection.rpyc" file and "MASM" folder into DDLC game folder.
 
 
-## Installing - MIDI: **Unable to update until 3.8 packages are ready**
+## Installing - MIDI
+**Requires: Core, MASM**
 
+1. Copy "zz_pianokeys.rpyc" file and MASM folder into DDLC game folder, replace the existing "zz_pianokeys.rpyc" file.
 
 # Reporting bugs and issues
 
