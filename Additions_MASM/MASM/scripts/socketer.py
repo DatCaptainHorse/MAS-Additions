@@ -4,6 +4,7 @@ import socket
 client = None
 data = []
 execs = 0
+useUDP = False
 
 def hasData(dat):
 	global data
@@ -13,27 +14,30 @@ def hasData(dat):
 	else:
 		return False
 
-def connectMAS():
+def connectMAS(UDPmode):
 	global client
 	global data
+	global useUDP
+
+	useUDP = UDPmode
 
 	if client == None:
 		SE.Log("\nConnecting to MAS..")
 	
-		client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		client.bind(("127.0.0.1", 23456))
-		#client.setblocking(False)
-		client.settimeout(0.01)
-
-		#host = socket.gethostname() # TCP
-		''' # TCP
-		while True:
-			try:
-				client.connect((host, port))
-			except socket.error: # Wait for connection
-				continue
-			break
-		'''
+		if useUDP:
+			client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+			client.bind(("127.0.0.1", 34567))
+			client.settimeout(0.01)
+		else:
+			client = socket.socket()
+			client.settimeout(0.01)
+			while True:
+				try:
+					client.connect(("127.0.0.1", 12345))
+				except socket.error: # Wait for connection
+					continue
+				break
+		
 		SE.Log("Connected!\n")
 		execs = 0
 
@@ -41,14 +45,20 @@ def receiveData():
 	global client
 	global data
 	global execs
+	global useUDP
+
 	if client != None:
 		try:
-			dat, addr = client.recvfrom(64)
+			if useUDP:
+				dat, addr = client.recvfrom(64)
+			else:
+				dat = client.recv(64)
+
 			if dat != None:
 				dat = dat.decode('utf-8')
 				SE.Log("received: {}".format(dat))
 				data.append(dat)
-		except socket.error: # No data
+		except socket.timeout: # No data
 			pass
 		
 		if hasData("first"):
@@ -56,11 +66,15 @@ def receiveData():
 
 def sendData(toSend):
 	global client
+	global useUDP
 	if client != None:
-		client.sendto(toSend.encode('utf-8'), ("127.0.0.1", 12345))
+		if useUDP:
+			client.sendto(toSend.encode('utf-8'), ("127.0.0.1", 23456))
+		else:
+			client.sendall(toSend.encode('utf-8'))
 			
 def Start():
-	connectMAS()
+	connectMAS(True)
 
 def Render():
 	receiveData()

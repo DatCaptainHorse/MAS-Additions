@@ -1,6 +1,6 @@
 init 4 python:
     #config.log = "debuglog.txt"
-    registerAddition("MASMC", "MASM Communicator", "0.1.6")
+    registerAddition("MASMC", "MASM Communicator", "0.1.7")
     import signal
     import socket
     import select
@@ -13,48 +13,60 @@ init 4 python:
         # Threaded socket communicator
         class MASM_Communicator:
             data = []
-            server = None
+            clientTCP = None
+            serverTCP = None
+            serverUDP = None
             masmApp = None
             appPath = None
             appExists = False
+            useUDP = False
 
             def __init__(self):
-                self.clientAddr = None
                 self.thread = None
 
-            def connectMASM(self):
-                ''' # TCP
-                self.server.listen(5)
-                while True:
-                    try:
-                        MASM_Communicator.client, self.clientAddr = self.server.accept()
-                    except socket.error:
-                        continue
-                    break
-                '''
-                MASM_Communicator.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                MASM_Communicator.server.settimeout(0.01)
-                MASM_Communicator.server.bind(("127.0.0.1", 12345))
+            def connectMASM(self, UDPmode):
+                MASM_Communicator.useUDP = UDPmode
+                if MASM_Communicator.useUDP:
+                    if MASM_Communicator.serverUDP is None:
+                        MASM_Communicator.serverUDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        MASM_Communicator.serverUDP.settimeout(0.01)
+                        MASM_Communicator.serverUDP.bind(("127.0.0.1", 23456))
+                else:
+                    if MASM_Communicator.serverTCP is None:
+                        MASM_Communicator.serverTCP = socket.socket()
+                        MASM_Communicator.serverTCP.settimeout(0.01)
+                        MASM_Communicator.serverTCP.bind(("127.0.0.1", 12345))
+                        MASM_Communicator.serverTCP.listen(5)
 
+                    if MASM_Communicator.clientTCP is None:
+                        while True:
+                            try:
+                                MASM_Communicator.clientTCP, addr = MASM_Communicator.serverTCP.accept()
+                            except socket.error:
+                                continue
+                            break
+                
                 self.thread = threading.Thread(target = self.communicateWithClient)
                 self.thread.setDaemon(True)
                 self.thread.start()
 
             def communicateWithClient(self):
-                while True:
+                while MASM_Communicator.appExists:
                     received = None
                     try:
-                        #rtr, rtw, err = select.select((MASM_Communicator.client,), (), (), 0)
-                        #if rtr:
-                        received, addr = self.server.recvfrom(64)
-                        if len(received) == 0:
-                            received = received.decode('utf-8')
-                            break
+                        if MASM_Communicator.useUDP:
+                            received, addr = MASM_Communicator.serverUDP.recvfrom(64)
+                        else:
+                            rtr, rtw, err = select.select((MASM_Communicator.clientTCP,), (), (), 0)
+                            if rtr:
+                                received = MASM_Communicator.clientTCP.recv(64)
+
                     except socket.error: # No data
                         pass
 
                     if received is not None:
                         #renpy.log("MASMC received data: {}".format(received))
+                        received = received.decode('utf-8')
                         MASM_Communicator.data.append(received)
 
                     if MASM_Communicator.masmApp is not None:
@@ -63,8 +75,6 @@ init 4 python:
                             MASM_Communicator.appExists = True
                         else:
                             MASM_Communicator.appExists = False
-
-                    time.sleep(0.001) # ease up tiny bit
                     
             @staticmethod
             def hasData(dat):
@@ -80,8 +90,12 @@ init 4 python:
 
             @staticmethod
             def clientSend(toSend):
-                if MASM_Communicator.server is not None:
-                    MASM_Communicator.server.sendto(toSend.encode('utf-8'), ("127.0.0.1", 23456))
+                if MASM_Communicator.useUDP:
+                    if MASM_Communicator.serverUDP is not None:
+                        MASM_Communicator.serverUDP.sendto(toSend.encode('utf-8'), ("127.0.0.1", 34567))
+                else:
+                    if MASM_Communicator.clientTCP is not None:
+                        MASM_Communicator.clientTCP.sendall(toSend.encode('utf-8'))
 
             @staticmethod
             def exiting():
@@ -112,7 +126,7 @@ init 4 python:
 
         communicator = MASM_Communicator()
         communicator.startMASM()
-        communicator.connectMASM()
+        communicator.connectMASM(True)
 
         if isAdditionFirstRun("MASMC"):
             MASM_Communicator.clientSend("first")
