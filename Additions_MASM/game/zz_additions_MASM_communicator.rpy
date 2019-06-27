@@ -1,5 +1,5 @@
 init 4 python:
-    config.log = "debuglog.txt"
+    #config.log = "debuglog.txt"
     registerAddition("MASMC", "MASM Communicator", "0.1.6")
     import signal
     import socket
@@ -54,7 +54,7 @@ init 4 python:
                         pass
 
                     if received is not None:
-                        renpy.log("MASMC received data: {}".format(received))
+                        #renpy.log("MASMC received data: {}".format(received))
                         MASM_Communicator.data.append(received)
 
                     if MASM_Communicator.masmApp is not None:

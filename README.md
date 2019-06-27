@@ -24,12 +24,9 @@ https://github.com/Monika-After-Story/MonikaModDev
 ## Installing - MASM
 **Requires: Core**
 
-1. [Download and Install Python 3.8 for 64-bit](https://www.python.org/downloads/release/python-380b1/) on your system, remember to add it to PATH during installation!
-![Install to Path](https://datatofish.com/wp-content/uploads/2018/10/0001_add_Python_to_Path.png)
+1. Copy "zz_additions_MASM_communicator.rpyc" file and "MASM" folder into DDLC game folder.
 
-2. Copy "zz_additions_MASM_communicator.rpyc" file and "MASM" folder into DDLC game folder.
-
-3. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "MASM" folder in the DDLC game folder.
+2. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "MASM" folder in the DDLC game folder.
 
 
 ## Installing - FaceDetectionRecognition

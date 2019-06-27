@@ -1,31 +1,66 @@
 # Temporary quick & cheaty implementation before Python 3.8 is released
 # along with official modules like numpy and cv2 for Python 3.8
 
-import os
+import os, sys
 import subprocess
 import socket
 import socketer
 
+import cv2
+import time
+
+recog = False
+
+cap = None
+start = None
+
+dirPath = os.path.dirname(os.path.realpath(__file__))
+realPath = os.path.dirname(dirPath)
+faceCascade = cv2.CascadeClassifier(realPath + "/haarcascade_frontalface_alt.xml")
+
 def faceRecognize():
-	dirPath = os.path.dirname(os.path.realpath(__file__))
-	masmPath = os.path.dirname(dirPath)
-	res = subprocess.check_output(["python", masmPath + "/scripts/_NSE_live.py"], shell=True).decode('utf-8')
-	print("Received {}".format(res))
-	if "YES" in res:
-		return True
-	else:
+	global cap
+	global start
+	ret, frame = cap.read()
+	if not ret:
 		return False
 
+	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+	gray = cv2.equalizeHist(gray)
+
+	faces = faceCascade.detectMultiScale(
+		gray,
+		scaleFactor=1.2,
+		minNeighbors=3,
+		minSize=(20, 20)
+	)
+
+	if len(faces) >= 1:
+		return True
+		
+	# 8 seconds oughta be enough
+	if (time.time() - start) > 8:
+		return False
+
+	return None
+
 def Update():
+	global cap
+	global start
 	# Message received, start recognizing
 	if socketer.hasData("recognizeFace"):
 		print("Recognizing..")
-		res = faceRecognize()
-		if res != None:
+		res = None
+		cap = cv2.VideoCapture(0)
+		start = time.time()
+		while res == None:
+			res = faceRecognize()
 			if res == True:
 				socketer.sendData("seeYou") # recognized player
-			else:
+				cap.release()
+			elif res == False:
 				socketer.sendData("cantSee") # failed to recognize
+				cap.release()
 
 '''
 import os
