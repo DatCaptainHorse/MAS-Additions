@@ -40,6 +40,12 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 1. Copy "zz_pianokeys.rpyc" file and MASM folder into DDLC game folder, replace the existing "zz_pianokeys.rpyc" file.
 
+# Credits
+
+* DatHorse#9516
+
+* LordBaaa#9748
+
 # Reporting bugs and issues
 
 Please report any bugs and issues you may have to DatHorse#9516 on Discord
