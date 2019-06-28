@@ -3,7 +3,6 @@ import socketer
 
 InPort = None
 curMSG = None
-curNote = None
 
 def Start():
 	global InPort
@@ -16,11 +15,9 @@ def Render():
 	for msg in InPort.iter_pending():
 		curMSG = msg
 		binary = curMSG.bin()
-		if len(binary) > 1 and binary[1] > 0 and binary[2] > 0:
+		if len(binary) > 1 and binary[1] > 0:
 			curNote = binary[1]
-			socketer.sendData("notedown.{}".format(curNote))
-		elif len(binary) > 1 and binary[1] > 0 and binary[2] == 0:
-			socketer.sendData("noteup.{}".format(binary[1]))
-			curNote = 0
-		else:
-			curNote = 0
+			if binary[0] == 144 and binary[2] > 0:
+				socketer.sendData("notedown.{}".format(curNote))
+			elif binary[2] == 0 or binary[0] == 128:
+				socketer.sendData("noteup.{}".format(binary[1]))

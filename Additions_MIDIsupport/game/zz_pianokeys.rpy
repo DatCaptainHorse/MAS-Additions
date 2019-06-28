@@ -2620,6 +2620,8 @@ init 810 python:
             }
 
             # setup MIDI keys
+            self.stTime = 0.0
+
             self.mkeys = {
                 65: mas_piano_keys.F4,
                 66: mas_piano_keys.F4SH,
@@ -3908,6 +3910,8 @@ init 810 python:
                             # Split note message into note up or down and get the number
                             splitted = dat.split('.')
 
+                            renpy.timeout(0)
+
                             # try to get key from number
                             key = None
                             try:
@@ -3917,6 +3921,11 @@ init 810 python:
 
                             if len(self.played) > self.KEY_LIMIT:
                                 self.played = list()
+    
+                            elif self.stTime-self.prev_time >= self.ev_timeout:
+                                self._timeoutFlow()
+    
+                            self.prev_time = self.stTime
 
                             if key is not None and splitted[0] == 'notedown':
                                 if not self.pressed.get(key, True):
@@ -3950,6 +3959,8 @@ init 810 python:
         def event(self, ev, x, y, st):
             # renpy event handler
             # NOTE: Renpy is EVENT-DRIVEN
+
+            self.stTime = st
 
             # DONE state means you immediate quit
             if self.state in self.FINAL_DONE_STATES:
