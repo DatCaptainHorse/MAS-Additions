@@ -85,6 +85,11 @@ init 4 python:
                     return False
 
             @staticmethod
+            def remData(dat):
+                if dat in MASM_Communicator.data:
+                    MASM_Communicator.data.remove(dat)
+
+            @staticmethod
             def canUse():
                 return MASM_Communicator.appExists
 
@@ -113,9 +118,9 @@ init 4 python:
 
                 if MASM_Communicator.appPath is not None:
                     if renpy.windows: # If we are running on Windows OS
-                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/MASM/MASM.exe'))) # Open MASM application subprocess
+                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/Additions/MASM/MASM.exe'))) # Open MASM application subprocess
                     elif renpy.linux or renpy.macintosh: # Linux / Mac..
-                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/MASM/MASM'))) # Good luck!
+                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/Additions/MASM/MASM'))) # Good luck!
 
                     if MASM_Communicator.masmApp is not None:
                         MASM_Communicator.appExists = True

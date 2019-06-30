@@ -1,6 +1,61 @@
 ﻿init 5 python:
-    registerAddition("SEAS", "Super Experimental Additions", "0.1.6")
+    config.log = "debuglog.txt"
+    import threading
+    import time
+    registerAddition("SEAS", "Super Experimental Additions", "0.1.7")
     addEvent(Event(persistent.event_database,eventlabel="monika_experimental_webcamera",category=['mod'],prompt="Webcamera",random=False,unlocked=True,pool=True))
+
+    if additionIsEnabled("SEAS") and additionIsEnabled("MASMC"):
+        faceThr = None
+        cycleTime = 30
+        notSeenCount = 0
+        periodicals = False
+        def periodicalFaceCheck():
+            global faceThr
+            global periodicals
+            global notSeenCount
+            global cycleTime
+            while periodicals:
+                for i in range(cycleTime):
+                    if periodicals:
+                        time.sleep(1)
+                    else:
+                        return
+
+                if MASM_Communicator.canUse():
+                    MASM_Communicator.clientSend('recognizeFace')
+
+                result = None
+                while result is None:
+                    if MASM_Communicator.hasData('seeYou'):
+                        result = True
+                        notSeenCount = 0
+                        break
+                    elif MASM_Communicator.hasData('cantSee') or MASM_Communicator.canUse() is False:
+                        result = False
+                        notSeenCount += 1
+                        break
+
+                if notSeenCount == 1:
+                    notSeenCount = 0
+
+        def enablePeriodicals():
+            global faceThr
+            global periodicals
+            global cycleTime
+            cycleTime = 30
+            periodicals = True
+            faceThr = threading.Thread(target = periodicalFaceCheck)
+            faceThr.setDaemon(True)
+            faceThr.start()
+
+        def disablePeriodicals():
+            global faceThr
+            global periodicals
+            periodicals = False
+            faceThr.join()
+
+        #enablePeriodicals()
 
 label monika_experimental_webcamera:
     if additionIsEnabled("SEAS") and additionIsEnabled("MASMC"):
