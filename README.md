@@ -42,9 +42,9 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 # Credits
 
-* DatHorse#9516
+* DatHorse (Discord: DatHorse#9516)
 
-* LordBaaa#9748
+* LordBaaa (Discord: LordBaaa#9748), [Github user page](https://github.com/LordBaaa)
 
 # Reporting bugs and issues
 
