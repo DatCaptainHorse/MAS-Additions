@@ -3,6 +3,7 @@
 # This system should be replaced by a proper Submod API ASAP.
 
 init python:
+    config.log = "debuglog.txt"
     import os
     from ConfigParser import SafeConfigParser
 
@@ -26,8 +27,8 @@ init python:
 
         if not foundInifile: # Dirty, but works
             for dirpath,subdirs,files in os.walk('.'):
-                if dirpath == 'game':
-                    creator = open(os.path.join(dirpath, additionsPath), 'w')
+                if 'Additions' in dirpath:
+                    creator = open(os.path.join(dirpath, 'additions.ini'), 'w')
                     creator.close()
                     break
 
