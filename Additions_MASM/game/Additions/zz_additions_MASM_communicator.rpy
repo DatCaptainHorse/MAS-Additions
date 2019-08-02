@@ -1,5 +1,4 @@
 init 4 python:
-    #config.log = "debuglog.txt"
     registerAddition("MASMC", "MASM Communicator", "0.1.7")
     import signal
     import socket
@@ -8,11 +7,13 @@ init 4 python:
     import subprocess
     import time
     import atexit
+    import re
 
     if additionIsEnabled("MASMC"):
         # Threaded socket communicator
         class MASM_Communicator:
             data = []
+            dictData = {}
             clientTCP = None
             serverTCP = None
             serverUDP = None
@@ -55,11 +56,11 @@ init 4 python:
                     received = None
                     try:
                         if MASM_Communicator.useUDP:
-                            received, addr = MASM_Communicator.serverUDP.recvfrom(64)
+                            received, addr = MASM_Communicator.serverUDP.recvfrom(128)
                         else:
                             rtr, rtw, err = select.select((MASM_Communicator.clientTCP,), (), (), 0)
                             if rtr:
-                                received = MASM_Communicator.clientTCP.recv(64)
+                                received = MASM_Communicator.clientTCP.recv(128)
 
                     except socket.error: # No data
                         pass
@@ -67,7 +68,11 @@ init 4 python:
                     if received is not None:
                         #renpy.log("MASMC received data: {}".format(received))
                         received = received.decode('utf-8')
-                        MASM_Communicator.data.append(received)
+                        if received.startswith('{{'):
+                            res = re.search("{{(.*) : (.*)}}", received)
+                            dictData[res.group(1)] = bool(res.group(2))
+                        else:
+                            MASM_Communicator.data.append(received)
 
                     if MASM_Communicator.masmApp is not None:
                         poll = MASM_Communicator.masmApp.poll()
@@ -95,6 +100,21 @@ init 4 python:
 
             @staticmethod
             def clientSend(toSend):
+                if MASM_Communicator.useUDP:
+                    if MASM_Communicator.serverUDP is not None:
+                        MASM_Communicator.serverUDP.sendto(toSend.encode('utf-8'), ("127.0.0.1", 34567))
+                else:
+                    if MASM_Communicator.clientTCP is not None:
+                        MASM_Communicator.clientTCP.sendall(toSend.encode('utf-8'))
+
+            @staticmethod
+            def dictHas(dictKey):
+                dictData.get(dictKey, False)
+
+            @staticmethod
+            def dictSend(sendKey, sendVal):
+                dictData[sendKey] = sendVal
+                toSend = ('{{' + sendKey + ':' + sendVal + '}}')
                 if MASM_Communicator.useUDP:
                     if MASM_Communicator.serverUDP is not None:
                         MASM_Communicator.serverUDP.sendto(toSend.encode('utf-8'), ("127.0.0.1", 34567))

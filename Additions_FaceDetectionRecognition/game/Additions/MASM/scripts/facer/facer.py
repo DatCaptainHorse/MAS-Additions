@@ -31,6 +31,7 @@ def camOff():
 
 	if onCam.isOpened():
 		onCam.release()
+		onCam = None
 		return True
 
 	return False
@@ -46,7 +47,7 @@ def camFrame():
 	return False
 
 # Takes pictures with the webcam and saves them to the output directory, used for training
-def take_faces(output_dir, count, delay = 0.25):
+def take_faces(output_dir, count, delay = 0.1):
 	cam = cv2.VideoCapture(0)
 	
 	if not cam.isOpened():
@@ -64,7 +65,7 @@ def take_faces(output_dir, count, delay = 0.25):
 		if not ret:
 			continue
 			
-		ars, recs = detect_faces_dnn(frame)
+		ars = detect_faces_dnn(frame)
 		if ars == None:
 			continue
 
@@ -75,7 +76,7 @@ def take_faces(output_dir, count, delay = 0.25):
 			except:
 				break
 
-			completed = completed + 1;
+			completed = completed + 1
 
 		# Wait a bit
 		time.sleep(delay)
@@ -89,7 +90,7 @@ def take_faces(output_dir, count, delay = 0.25):
 
 # Detect any faces inside an image using haar cascades
 # returns the face area images in gray and face rectangles
-def detect_faces_haar(img):
+def detect_faces_haar(img, sceneGray = True):
 	# Get the gray from image and equalize it
 	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	gray = cv2.equalizeHist(gray)
@@ -103,21 +104,29 @@ def detect_faces_haar(img):
 	
 	# No faces? Return nothing
 	if (len(faces) == 0):
-		return None, None
+		return None
 
 	grays = []
 	
 	for face in faces:
 		(x, y, w, h) = face
-		grayArea = gray[y:y+w, x:x+h]
+
+		grayArea = None
+		if sceneGray:
+			grayArea = gray[y:y+w, x:x+h]
+		else:
+			area = img[y:y+w, x:x+h]
+			grayArea = cv2.cvtColor(area, cv2.COLOR_BGR2GRAY)
+			grayArea = cv2.equalizeHist(grayArea)
+			
 		grays.append(grayArea)
 	
-	return grays, faces
+	return grays
 
 # Detect any faces inside an image using deep neural networks
 # uses pre-trained caffe models and protos
 # returns the face area images in gray and face rectangles
-def detect_faces_dnn(img):
+def detect_faces_dnn(img, sceneGray = True):
 	global face_recognizer_dnn
 	
 	realPath = os.path.dirname(os.path.realpath(__file__))
@@ -138,28 +147,32 @@ def detect_faces_dnn(img):
 	
 	# No faces? Return nothing
 	if (len(faces) == 0):
-		return None, None
+		return None
 	
 	areas = []
-	rects = []
-	
+
 	for i in range(0, faces.shape[2]):
 		confidence = faces[0, 0, i, 2]
 		
-		if confidence < 0.2:
+		if confidence < 0.2: # skip low confidence faces
 			continue
 		
 		box = faces[0, 0, i, 3:7] * np.array([w, h, w, h])
-		(x, y, wi, he) = box.astype("int")
+		(sX, sY, eX, eY) = box.astype("int")
 		
-		faceArea = img[y:y+wi, x:x+he]
-		grayed = cv2.cvtColor(faceArea, cv2.COLOR_BGR2GRAY)
-		grayed = cv2.equalizeHist(grayed)
+		grayed = None
+		if sceneGray:
+			grayed = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+			grayed = cv2.equalizeHist(grayed)
+			grayed = grayed[sY:eY, sX:eX]
+		else:
+			cropped = img[sY:eY, sX:eX]
+			grayed = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+			grayed = cv2.equalizeHist(grayed)
+
 		areas.append(grayed)
 		
-		rects.append([x, y, wi, he])
-		
-	return areas, rects
+	return areas
 		
 # Trains using any images inside a folder, images must be in their own subfolder, subfolders named after the persons
 # ex. images/MyName, and you give it "images" directory as the data_folder
@@ -197,7 +210,7 @@ def train_faces_lbph(data_folder):
 			print("Progress: {}/{} images".format(i + 1, pSize), end='\r')
 	
 			if image is not None:
-				faces, rects = detect_faces_haar(image)
+				faces = detect_faces_haar(image)
 			
 			if faces is not None:
 				facelist.append(faces[0])
@@ -239,7 +252,7 @@ def load_trained_lbph(load_dir, namelist):
 # argument threshold is the threshold for faces being recognized
 # higher value is lower tolerance, meaning random faces 
 # could be recognized as other people
-def recognize_faces_lbph(imgin, threshold = 0.8):
+def recognize_faces_lbph(imgin, threshold = 0.8, useDNN = False):
 	image = None
 
 	if imgin is not None:
@@ -251,12 +264,19 @@ def recognize_faces_lbph(imgin, threshold = 0.8):
 		if image is None:
 			return False, None
 			
-		faces, rects = detect_faces_haar(image)
+		faces = None
+		if useDNN:
+			faces = detect_faces_dnn(image, True)
+		else:
+			faces = detect_faces_haar(image, True)
 		
 		recognized = []
 		if faces is not None:
 			for i, face in enumerate(faces):
 				label, difference = face_recognizer_lbph.predict(face)
+				#cv2.imshow("IMG", face)
+				#cv2.waitKey(0)
+				#print("{}, {}".format(label, difference))
 				if difference < (threshold * 100):
 					name = persons[label]
 					recognized.append(tuple((name, faces[i])))

@@ -1,71 +1,4 @@
-# Temporary quick & cheaty implementation before Python 3.8 is released
-# along with official modules like numpy and cv2 for Python 3.8
-
-import os, sys
-import subprocess
-import socket
-import socketer
-
-import cv2
-import time
-
-recog = False
-
-cap = None
-start = None
-
-dirPath = os.path.dirname(os.path.realpath(__file__))
-realPath = os.path.dirname(dirPath)
-faceCascade = cv2.CascadeClassifier(realPath + "/haarcascade_frontalface_alt.xml")
-
-def faceRecognize():
-	global cap
-	global start
-	ret, frame = cap.read()
-	if not ret:
-		return False
-
-	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-	gray = cv2.equalizeHist(gray)
-
-	faces = faceCascade.detectMultiScale(
-		gray,
-		scaleFactor=1.2,
-		minNeighbors=3,
-		minSize=(20, 20)
-	)
-
-	if len(faces) >= 1:
-		return True
-		
-	# 8 seconds oughta be enough
-	if (time.time() - start) > 8:
-		return False
-
-	return None
-
-def Update():
-	global cap
-	global start
-	# Message received, start recognizing
-	if socketer.hasData("recognizeFace"):
-		print("Recognizing..")
-		res = None
-		cap = cv2.VideoCapture(0)
-		start = time.time()
-		while res == None:
-			res = faceRecognize()
-			if res == True:
-				socketer.sendData("seeYou") # recognized player
-				cap.release()
-			elif res == False:
-				socketer.sendData("cantSee") # failed to recognize
-				cap.release()
-
-'''
 import os
-import socket
-import cv2
 import facer
 import pathlib
 import socketer
@@ -112,7 +45,7 @@ def facePrepare():
 
 		if doTake == True:
 			print("No facial data found, please look at the camera while we take some")
-			ret = facer.take_faces(pImagePath, 25, 0.1)
+			ret = facer.take_faces(pImagePath, 100, 0.005)
 			if ret is False:
 				return False
 			
@@ -124,10 +57,14 @@ def facePrepare():
 	return True
 
 
-times = 0	
+times = 0
+threshold = 0.6
+alternater = False
 def faceRecognize():
 	global detected
 	global preparedYet
+	global alternater
+	global threshold
 	global times
 
 	if not preparedYet:
@@ -139,12 +76,16 @@ def faceRecognize():
 	if not detected:
 		frame = facer.camFrame()
 
-		found, people = facer.recognize_faces_lbph(frame, 0.6)
+		# alternate between DNN and HAAR detection for recognizer, to be on safe side
+		found, people = facer.recognize_faces_lbph(frame, threshold, alternater)
 		if found:
 			for person in people:
 				if person[0] == None:
 					times += 1
 					print("Found someone x{}".format(times), end='\r')
+					# raise the threshold slowly each cycle just to recognize player eventually if the data is dirty
+					if threshold < 0.9:
+						threshold += 0.05
 				else:
 					print("\nFound {}".format(person[0]))
 					detected = True
@@ -152,7 +93,11 @@ def faceRecognize():
 		facer.camOff()
 		detected = False
 		times = 0
+		threshold = 0.6
+		alternater = False
 		return True
+
+	alternater ^= 1
 
 	return None
 		
@@ -172,9 +117,13 @@ def Update():
 	if socketer.hasData("recognizeFace"):
 		print("Recognizing..")
 		if preparedYet == False:
-			recognizing = facePrepare() # No data prepared this session, do so
-			if recognizing == False:
+			err = facePrepare() # No data prepared this session, do so
+			if err == False:
 				SE.Log("Error when preparing data")
+			else:
+				recognizing = True
+		else:
+			recognizing = True
 
 	# Non-blocking recognizion
 	if recognizing:
@@ -186,4 +135,3 @@ def Update():
 			elif res == False:
 				socketer.sendData("cantSee") # failed to recognize
 				recognizing = False
-'''

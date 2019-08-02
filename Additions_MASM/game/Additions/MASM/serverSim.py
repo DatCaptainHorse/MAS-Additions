@@ -12,8 +12,8 @@ receiveData = True
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server.settimeout(0.01)
 
-host = socket.gethostname()
-port = 12345
+host = "127.0.0.1"
+port = 23456
 
 server.bind((host, port))
 #server.listen()
@@ -26,7 +26,8 @@ while True:
 	break
 '''
 print("Connected client")
-#client.sendall("recognizeFace".encode('utf-8'))
+#toSend = ('{{' + 'Awoo' + ':' + False + '}}')
+server.sendto("recognizeFace".encode('utf-8'), ("127.0.0.1", 34567))
 
 def comm():
 	while receiveData:
