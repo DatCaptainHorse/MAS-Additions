@@ -26,7 +26,7 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 1. Copy "Additions" folder into DDLC game folder.
 
-2. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "game/Additions/MASM/" folder.
+2. Copy "MASM.exe", "OpenAL32.dll", "python38.dll" and "quad.shader" files from MASM_Binaries folder into "game/Additions/MASM/" folder.
 
 
 ## Installing - FaceDetectionRecognition
