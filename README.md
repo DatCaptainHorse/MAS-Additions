@@ -8,7 +8,7 @@ https://github.com/Monika-After-Story/MonikaModDev
 # Additions
 * Core, core functionality, enables adding of additions and enabling/disabling them using ingame UI or ini file.
 
-* MASM, MAS Module is an external program which enables the use of Python 3 and Lua, along with some extra features such as 3D audio (3D audio position is currently broken).
+* MASM, MAS Module is an external program which enables the use of Python 3 and Lua, along with some extra features such as 3D audio using OpenAL-Soft and Graphics using OpenGL.
 
 * Face D&R, adds a new 'Webcamera' topic which allows Monika to see the player using OpenCV. v1.0.6 is currently only capable of face detection since earlier features broke with Python 3.8 beta upgrade.
 
