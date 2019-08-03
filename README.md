@@ -18,27 +18,27 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 
 ## Installing - Core
-1. Copy "python-packages", "screens.rpyc" and "zz_additions.rpyc" files into DDLC game folder.
+1. Copy "Additions" and "python-packages" folders into DDLC game folder.
 
 
 ## Installing - MASM
 **Requires: Core**
 
-1. Copy "zz_additions_MASM_communicator.rpyc" file and "MASM" folder into DDLC game folder.
+1. Copy "Additions" folder into DDLC game folder.
 
-2. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "MASM" folder in the DDLC game folder.
+2. Copy "MASM.exe", "OpenAL32.dll" and "python38.dll" files from MASM_Binaries folder into "game/Additions/MASM/" folder.
 
 
 ## Installing - FaceDetectionRecognition
 **Requires: Core, MASM**
 
-1. Copy "zz_additions_face_detection.rpyc" file and "MASM" folder into DDLC game folder.
+1.  Copy "Additions" folder into DDLC game folder.
 
 
 ## Installing - MIDI
 **Requires: Core, MASM**
 
-1. Copy "zz_pianokeys.rpyc" file and MASM folder into DDLC game folder, replace the existing "zz_pianokeys.rpyc" file.
+1.  Copy "Additions" folder into DDLC game folder.
 
 # Credits
 
