@@ -45,17 +45,19 @@ def facePrepare():
 
 		if doTake == True:
 			print("No facial data found, please look at the camera while we take some")
-			ret = facer.take_faces(pImagePath, 100, 0.005)
+			ret = facer.take_faces(pImagePath, 100, 0.01)
 			if ret is False:
 				return False
 			
-		facer.train_faces_lbph(pDataPath)
+		res = facer.train_faces_lbph(pDataPath)
+		if not res:
+			return False
+
 		facer.save_trained_lbph(pLBPHPath)
 			
 	preparedYet = True
 
 	return True
-
 
 times = 0
 threshold = 0.6
@@ -82,7 +84,7 @@ def faceRecognize():
 			for person in people:
 				if person[0] == None:
 					times += 1
-					print("Found someone x{}".format(times), end='\r')
+					print("Found someone x{} [{}]".format(times, person[2]), end='\r')
 					# raise the threshold slowly each cycle just to recognize player eventually if the data is dirty
 					if threshold < 0.9:
 						threshold += 0.05
@@ -120,6 +122,7 @@ def Update():
 			err = facePrepare() # No data prepared this session, do so
 			if err == False:
 				SE.Log("Error when preparing data")
+				socketer.sendData("cantSee") # failed to recognize
 			else:
 				recognizing = True
 		else:

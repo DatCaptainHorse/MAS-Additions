@@ -38,9 +38,13 @@ def camOff():
 
 def camFrame():
 	global onCam
+	if not onCam.isOpened():
+		print("Error: Camera no longer open")
+		return False
+
 	ret, frame = onCam.read()
 	if not ret:
-		return False
+		return None
 	else:
 		return frame
 
@@ -48,31 +52,25 @@ def camFrame():
 
 # Takes pictures with the webcam and saves them to the output directory, used for training
 def take_faces(output_dir, count, delay = 0.1):
-	cam = cv2.VideoCapture(0)
-	
-	if not cam.isOpened():
-		print("Error: Unable to open camera")
-		return False
+	global onCam
+
+	camOn()
 	
 	completed = 0
 	while (completed < count):
-		if not cam.isOpened():
-			print("Error: Camera no longer open")
-			return False
-		
 		print ("Taking picture: {}/{}".format(completed + 1, count), end="\r")
-		ret, frame = cam.read()
-		if not ret:
+		frame = camFrame()
+		if frame is None:
 			continue
 			
-		ars = detect_faces_dnn(frame)
-		if ars == None:
+		faces = detect_faces_dnn(frame)
+		if faces == None:
 			continue
 
-		if len(ars) > 0:
+		if len(faces) > 0:
 			img_name = output_dir + '/' + "face_{}.png".format(completed)
 			try:
-				cv2.imwrite(img_name, ars[0])
+				cv2.imwrite(img_name, faces[0])
 			except:
 				break
 
@@ -81,7 +79,7 @@ def take_faces(output_dir, count, delay = 0.1):
 		# Wait a bit
 		time.sleep(delay)
 
-	cam.release()
+	camOff()
 
 	if completed == count:
 		return True
@@ -191,7 +189,7 @@ def train_faces_lbph(data_folder):
 		label = x
 		persons.append(subdir)
 		
-		print("Training LBPH of {}".format(subdir))
+		print("Preparing LBPH of {}".format(subdir))
 		
 		fileDir = os.path.join(data_folder, subdir)
 		files = os.listdir(fileDir)
@@ -208,19 +206,29 @@ def train_faces_lbph(data_folder):
 			image = cv2.imread(image_path)
 			
 			print("Progress: {}/{} images".format(i + 1, pSize), end='\r')
-	
+
 			if image is not None:
-				faces = detect_faces_haar(image)
-			
-			if faces is not None:
-				facelist.append(faces[0])
+				image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 				labels.append(label)
-				
+				facelist.append(image)
+
 		x = x + 1
 		
 		print('\n')
-			
-	face_recognizer_lbph.train(facelist, np.array(labels))
+		
+	if len(facelist) <= 0:
+		print("Failed to prepare data")
+		return False
+
+	print("Training LBPH.. ", end='')
+	try:
+		face_recognizer_lbph.train(facelist, np.array(labels))
+	except Exception as e:
+		print("Failed, reason: {}".format(str(e)))
+		return False
+
+	print("Success")
+	return True
 
 # Save trained LBPH recognition algorithm
 # requires that you train LBPH first
@@ -279,9 +287,9 @@ def recognize_faces_lbph(imgin, threshold = 0.8, useDNN = False):
 				#print("{}, {}".format(label, difference))
 				if difference < (threshold * 100):
 					name = persons[label]
-					recognized.append(tuple((name, faces[i])))
+					recognized.append(tuple((name, faces[i], difference)))
 				else:
-					recognized.append(tuple((None, faces[i])))
+					recognized.append(tuple((None, faces[i], difference)))
 			
 		return True, recognized
 	return False, None
