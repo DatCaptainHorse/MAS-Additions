@@ -3,7 +3,6 @@
 # This system should be replaced by a proper Submod API ASAP.
 
 init python:
-    config.log = "debuglog.txt"
     import os
     from ConfigParser import SafeConfigParser
 

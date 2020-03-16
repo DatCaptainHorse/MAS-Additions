@@ -21,27 +21,27 @@ def facePrepare():
 	doTake = True
 
 	# Setup some paths
-	pDataPath = masmPath + '\\' + "face-data"
-	pImagePath = pDataPath + '\\' + "Player"
-	pLBPHPath = os.path.relpath(pDataPath + '\\' + "player.xml")
+	pDataPath = pathlib.Path(masmPath)/"face-data"
+	pImagePath = pDataPath/"Player"
+	pLBPHPath = pDataPath/"player.xml"
 	
 	# face-data path does not exist, create it
-	if not pathlib.Path(pDataPath).exists():
-		pathlib.Path(pDataPath).mkdir(parents = True, exist_ok = True)
+	if not pDataPath.exists():
+		pDataPath.mkdir(parents = True, exist_ok = True)
 	
 	# existing facial data exists, load the data
-	if pathlib.Path(pLBPHPath).exists():
+	if pLBPHPath.exists():
 		print("Loading facial data")
 		facer.load_trained_lbph(pLBPHPath, ["Player"])
 	else: # no existing data
-		if pathlib.Path(pImagePath).exists(): # check if there are any existing images
+		if pImagePath.exists(): # check if there are any existing images
 			files = os.listdir(pImagePath)
-			if len(files) < 1:
+			if len(files) == 0:
 				doTake = True
 			else:
 				doTake = False
 		else: # create path for images
-			pathlib.Path(pImagePath).mkdir(parents = True, exist_ok = True)
+			pImagePath.mkdir(parents = True, exist_ok = True)
 
 		if doTake == True:
 			print("No facial data found, please look at the camera while we take some")
@@ -136,5 +136,6 @@ def Update():
 				socketer.sendData("seeYou") # recognized player
 				recognizing = False
 			elif res == False:
+				SE.Log("Error, something went wrong during recognition")
 				socketer.sendData("cantSee") # failed to recognize
 				recognizing = False

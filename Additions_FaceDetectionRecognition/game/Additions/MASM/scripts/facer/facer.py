@@ -6,6 +6,7 @@ import os
 import time
 import numpy as np
 import cv2
+import pathlib
 
 face_recognizer_lbph = None
 face_recognizer_dnn = None
@@ -19,7 +20,7 @@ def camOn():
 
 	if not onCam.isOpened():
 		print("Unable to open camera")
-		onCam == None
+		onCam = None
 		return False
 
 	return True
@@ -51,11 +52,8 @@ def camFrame():
 	return False
 
 # Takes pictures with the webcam and saves them to the output directory, used for training
-def take_faces(output_dir, count, delay = 0.1):
-	global onCam
-
+def take_faces(output_dir, count, delay = 0.01):
 	camOn()
-	
 	completed = 0
 	while (completed < count):
 		print ("Taking picture: {}/{}".format(completed + 1, count), end="\r")
@@ -63,28 +61,23 @@ def take_faces(output_dir, count, delay = 0.1):
 		if frame is None:
 			continue
 			
-		faces = detect_faces_dnn(frame)
+		faces = detect_faces_haar(frame)
 		if faces == None:
 			continue
 
 		if len(faces) > 0:
-			img_name = output_dir + '/' + "face_{}.png".format(completed)
 			try:
-				cv2.imwrite(img_name, faces[0])
+				cv2.imwrite(os.path.join(output_dir, "face_{}.png".format(completed)), faces[0])
 			except:
 				break
 
-			completed = completed + 1
+			completed += 1
 
 		# Wait a bit
 		time.sleep(delay)
 
 	camOff()
-
-	if completed == count:
-		return True
-	else:
-		return False
+	return completed == count
 
 # Detect any faces inside an image using haar cascades
 # returns the face area images in gray and face rectangles
@@ -220,7 +213,7 @@ def train_faces_lbph(data_folder):
 		print("Failed to prepare data")
 		return False
 
-	print("Training LBPH.. ", end='')
+	print("Training LBPH.. ", end='', flush=True)
 	try:
 		face_recognizer_lbph.train(facelist, np.array(labels))
 	except Exception as e:
@@ -235,11 +228,18 @@ def train_faces_lbph(data_folder):
 def save_trained_lbph(save_dir):
 	global face_recognizer_lbph
 	
+	print("Saving LBPH.. ", end='', flush=True)
 	if face_recognizer_lbph is None:
 		print("Unable to save. LBPH recognizer not trained yet")
 		return
 	
-	face_recognizer_lbph.write(save_dir)
+	try:
+		face_recognizer_lbph.write(save_dir)
+	except Exception as e: 
+		print("Unable to save. Reason: {}".format(e))
+		return
+		
+	print("Success")
 	
 # Load trained LBPH recognition algorithm
 # you need to give namelist with correct indices
@@ -249,10 +249,12 @@ def load_trained_lbph(load_dir, namelist):
 	
 	persons = namelist
 	
+	print("Loading LBPH.. ", end='', flush=True)
 	if face_recognizer_lbph is None:
 		face_recognizer_lbph = cv2.face.LBPHFaceRecognizer_create()
 		
 	face_recognizer_lbph.read(load_dir)
+	print("Success")
 	
 # Attempts to recognize lbph trained faces within input image
 # returns boolean if any face is detected and tuple of recognized faces

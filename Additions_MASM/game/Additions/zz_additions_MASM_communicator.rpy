@@ -1,5 +1,5 @@
 init 4 python:
-    registerAddition("MASMC", "MASM Communicator", "0.1.7")
+    registerAddition("MASMC", "MASM Communicator", "0.1.8")
     import signal
     import socket
     import select
@@ -96,7 +96,7 @@ init 4 python:
 
             @staticmethod
             def canUse():
-                return MASM_Communicator.appExists
+                return True
 
             @staticmethod
             def clientSend(toSend):
@@ -140,7 +140,7 @@ init 4 python:
                     if renpy.windows: # If we are running on Windows OS
                         MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/Additions/MASM/MASM.exe'))) # Open MASM application subprocess
                     elif renpy.linux or renpy.macintosh: # Linux / Mac..
-                        MASM_Communicator.masmApp = subprocess.Popen(renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/Additions/MASM/MASM'))) # Good luck!
+                        MASM_Communicator.masmApp = subprocess.Popen(["LD_LIBRARY_PATH=.", renpy.loader.transfn(os.path.join(MASM_Communicator.appPath, '/Additions/MASM/MASM'))]) # Good luck!
 
                     if MASM_Communicator.masmApp is not None:
                         MASM_Communicator.appExists = True
