@@ -10,41 +10,20 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 * MASM, MAS Module is an external program which enables the use of Python 3 and Lua, along with some extra features such as 3D audio using OpenAL-Soft and Graphics using OpenGL.
 
-* Face D&R, adds a new 'Webcamera' topic which allows Monika to see the player using OpenCV. v1.0.6 is currently only capable of face detection since earlier features broke with Python 3.8 beta upgrade.
+* Face D&R, adds a new "Webcamera" topic which allows Monika to see the player using OpenCV. v1.0.6 is currently only capable of face detection since earlier features broke with Python 3.8 beta upgrade.
 
 * MIDI, adds MIDI functionality, routes MIDI input to MAS piano keys.
 
-**You always need Core and MASM to be installed for most other things to work.**
-
-## Outdated instructions below
-
-## Installing - Core
-1. Copy "Additions" and "python-packages" folders into DDLC game folder.
-
-
-## Installing - MASM
-**Requires: Core**
-
-1. Copy "Additions" folder into DDLC game folder.
-
-2. Copy "MASM.exe", "OpenAL32.dll", "python38.dll" and "quad.shader" files from MASM_Binaries folder into "game/Additions/MASM/" folder.
-
-
-## Installing - FaceDetectionRecognition
-**Requires: Core, MASM**
-
-1.  Copy "Additions" folder into DDLC game folder.
-
-
-## Installing - MIDI
-**Requires: Core, MASM**
-
-1.  Copy "Additions" folder into DDLC game folder.
+## Downloading and Installing
+1. Go to Releases tab, you should see it left to the green button that says "Clone or download"
+2. Under the latest release should be clickable text that says "Assets", click that and choose the pack you want to download.
+3. Installation should be as easy as dropping the game folder inside archive where your MAS game folder is and merging them.
 
 # Credits
 
 *  DatHorse (Discord: DatHorse#9516)
 *  LordBaaa (Discord: LordBaaa#9748), [Github user page](https://github.com/LordBaaa)
+*  bin (Discord: bin#0905), [Github user page](https://github.com/flumf)
 
 # Reporting bugs and issues
 
