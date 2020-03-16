@@ -16,6 +16,8 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 **You always need Core and MASM to be installed for most other things to work.**
 
+## Outdated instructions below
+
 ## Installing - Core
 1. Copy "Additions" and "python-packages" folders into DDLC game folder.
 
