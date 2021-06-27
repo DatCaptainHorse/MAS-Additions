@@ -6,25 +6,25 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 
 # Additions
-* Core, core functionality, enables adding of additions and enabling/disabling them using ingame UI or ini file.
+* MASM. MAS Module is an external program which enables the use of Python 3. Audio and Graphics features have been disabled for now. Required by other additions below.
 
-* MASM, MAS Module is an external program which enables the use of Python 3 and Lua, along with some extra features such as 3D audio using OpenAL-Soft and Graphics using OpenGL.
+* Face Detection and Recognition. allows for Monika to see you. API for other Submods to use the feature.
 
-* Face D&R, adds a new "Webcamera" topic which allows Monika to see the player using OpenCV. v1.0.6 is currently only capable of face detection since earlier features broke with Python 3.8 beta upgrade.
-
-* MIDI, adds MIDI functionality, routes MIDI input to MAS piano keys.
+* MIDI. Adds MIDI keyboard support for the piano.
 
 ## Downloading and Installing
-1. Go to Releases tab, you should see it left to the green button that says "Clone or download"
-2. Under the latest release should be clickable text that says "Assets", click that and choose the pack you want to download.
-3. Installation should be as easy as dropping the game folder inside archive where your MAS game folder is and merging them.
+1. Go to Releases link visible on the right side.
+2. Under the latest release there text that says "Assets", click that and choose the .zip file.
+3. Extract the .zip file somewhere temporary.
+4. Installation should be as easy if you've installed Submods before. Copy Submods folder from MASM folder into MAS game folder, for other additions you want copy their respective Submods folder in as well.
 
 # Credits
 
-*  DatHorse (Discord: DatHorse#9516)
-*  LordBaaa (Discord: LordBaaa#9748), [Github user page](https://github.com/LordBaaa)
-*  bin (Discord: bin#0905), [Github user page](https://github.com/flumf)
+*  DatHorse, self-explanatory (Discord: DatHorse#9516)
+*  LordBaaa, helping to test new features [Github user page](https://github.com/LordBaaa)
+*  bin, helping with code [Github user page](https://github.com/flumf)
+*  SykkNyzz, helping to test Linux support.
 
 # Reporting bugs and issues
 
-Please report any bugs and issues you may have to DatHorse#9516 on Discord
+Report any bugs and issues you may have to DatHorse#9516 on Discord
