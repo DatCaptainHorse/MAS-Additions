@@ -16,6 +16,7 @@ server.bind(("127.0.0.1", 24488))
 #toSend = ('{{' + 'Awoo' + ':' + 'False' + '}}')
 #server.sendto(toSend.encode('utf-8'), ("127.0.0.1", 24489))
 #server.sendto("recognizeFace.DNN".encode('utf-8'), ("127.0.0.1", 24489))
+server.sendto("ping".encode('utf-8'), ("127.0.0.1", 24489))
 
 def comm():
 	while receiveData:
@@ -28,6 +29,6 @@ def comm():
 			pass
 		if received != None:
 			data.append(received)
-			#break
+			break
 	server.close()
 comm()

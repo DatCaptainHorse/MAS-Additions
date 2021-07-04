@@ -44,21 +44,20 @@ init -991 python:
         commThread = None
         communicationRun = None
         commLock = None
+        latency = 0.0
+        startTime = 0.0
 
         @staticmethod
         def startMASM():
             for root, dirs, files in os.walk("."):
                 for name in files:
-                    if name == "MASM.exe":
+                    if name == "MASM.exe" or name == "MASM":
                         MASM.path = os.path.abspath(os.path.join(root, name))
                         break
 
             if MASM.path: # Open MASM subprocess
                 try:
-                    #if renpy.windows: # If we are running on Windows..
                     MASM.subProc = subprocess.Popen(MASM.path)
-                    #elif renpy.linux or renpy.macintosh: # Linux / Mac..
-                    #	 MASM.subProc = subprocess.Popen(MASM_path)
                     MASM.status = "Subprocess was created"
                     MASM.initialized = 1
                 except:
@@ -137,10 +136,12 @@ init -991 python:
                     if received.startswith("{{"):
                         res = re.search("{{(.*):(.*)}}", received)
                         dictData[res.group(1)] = str(res.group(2)).lower() in ("True", "true", "1")
-                    else:
+                    elif received != "pong":
                         if received in MASM.data: # Don't allow duplicates but remove older copy so we get a refresher
                             MASM.data.remove(received)
                         MASM.data.append(received)
+                    else:
+                        MASM.latency = (time.time() - MASM.startTime) * 1000
                     MASM.commLock.release()
                 else:
                     MASM.commLock.acquire()
@@ -173,6 +174,8 @@ init -991 python:
         @staticmethod
         def sendData(toSend):
             if MASM.isWorking():
+                if toSend == "ping":
+                    MASM.startTime = time.time()
                 MASM.socketUDP.sendto(toSend.encode("utf-8"), ("127.0.0.1", 24489))
 
         @staticmethod
@@ -221,14 +224,15 @@ screen MASM_settings_pane():
         style_prefix "check"
 
         text "MASM Status: [MASM.status]"
+        text "MASM Latency: [MASM.latency]ms"
         text "MASM PID: [subprocPID]"
         text "MASM Path: [strPath]"
         
         if _tooltip:
             textbutton _("Test Packet"):
-                action Function(MASM.sendData, "Test Packet")
+                action Function(MASM.sendData, "ping")
                 hovered SetField(_tooltip, "value", "For debugging purposes, sends a test packet to MASM process")
                 unhovered SetField(_tooltip, "value", _tooltip.default)
         else:
             textbutton _("Test Packet"):
-                action Function(MASM.sendData, "Test Packet")
+                action Function(MASM.sendData, "ping")

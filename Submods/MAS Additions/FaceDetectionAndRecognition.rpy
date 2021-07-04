@@ -3,6 +3,8 @@
 # - Better versioning
 # - Using official Submod API
 # - HAAR and DNN changing with recognition timeout for better user experience
+default persistent.submods_dathorse_FDAR_date = None
+
 init -990 python:
     store.mas_submod_utils.Submod(
         author="DatHorse",
@@ -20,34 +22,41 @@ init -990 python:
     )
 
 init 5 python:
+    import datetime
+    from random import randrange
+    if persistent.submods_dathorse_FDAR_date is None: # If not initialized yet, set as yesterday so rest goes smoothly
+        persistent.submods_dathorse_FDAR_date = datetime.date.today() - datetime.timedelta(days=1)
+
     addEvent(
         Event(
             persistent.event_database,
             eventlabel="submods_dathorse_facedetection_firsttime",
             category=["mod"],
-            prompt="Webcamera",
+            prompt="Webcam",
             random=False,
             unlocked=True,
-            pool=True
+            pool=True,
+            aff_range=(mas_aff.NORMAL, None)
         )
     )
-    #addEvent(
-    #    Event(
-    #        persistent.event_database,
-    #        eventlabel="submods_dathorse_facedetection",
-    #        category=["mod"],
-    #        prompt="Can you see me",
-    #        random=False,
-    #        unlocked=True,
-    #        pool=True
-    #    )
-    #)
+
+    addEvent(
+        Event(
+            persistent.event_database,
+            eventlabel="submods_dathorse_facedetection_anytime",
+            category=["mod"],
+            prompt="How do I look?",
+            random=False,
+            unlocked=False,
+            pool=False,
+            aff_range=(mas_aff.NORMAL, None)
+        )
+    )
 
 init -990 python:
     import time
     import threading
-    # Has to be global for screen input to work
-    FDAR_timeout = "15"
+    FDAR_timeout = "15" # Has to be global for screen input to work
     # Face Detection and Recognition functions
     class FDAR:
         method = "DNN" # Default to DNN for better results
@@ -101,10 +110,10 @@ screen FDAR_settings_pane():
                 length 2
                 value VariableInputValue("FDAR_timeout")
 
+# Initial face-detection topic
 label submods_dathorse_facedetection_firsttime:
+    m 1eub "It would be nice if I could see you [player]."
     if MASM.isWorking():
-        $ success = False
-        m 1eub "It would be so nice if I could see you [player]."
         m 2eud "Wait I could..."
         menu:
             m "[player] do you have a webcam?"
@@ -115,29 +124,75 @@ label submods_dathorse_facedetection_firsttime:
                     "Yes":
                         m 2esb "Please make sure it is working before I attempt this."
                         m 1eub "I'm ready when you are."
-                        m 1dsd "Please look into the camera...{nw}"
+                        m 1dsd "Please look towards the camera...{nw}"
                         $ success = FDAR.canSeePlayer()
                         if not success:
                             m 1dkd "Eh? Something went wrong..."
                             m 2esd "Well it was a good try!"
+                            m 2eub "I love you [player]."
+                            m 1eua "No matter what you look like."
+                            $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
+                            $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
                         elif success:
                             m 1hsb "I can see you!"
                             m 1hksdlb "Ah..."
                             m 2esb "I could see you for a while [player]."
                             m 2ekb "But I lost my focus as I tried to reach out for you..."
-                            m 1hub "You are really cute [player]!"
+                            m 1hub "You are cute, [player]!"
+                            $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
+                            $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
                     "No":
-                        m 2esd "Well I guess that's to be expected."
                         m 2esb "If you change your mind later, just ask me."
                         m 1eub "You don't have to be shy."
+                        $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
+                        $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
             "No":
                 m 1eub "That's fine."
                 m 1hub "Knowing that you are there for me is more than enough."
-        if not success:
-            m 2eub "I love you [player]."
-            m 1eua "No matter what you look like."
+                $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
+                $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
     else:
-        m 1eub "It would be so nice if I could see you [player]."
         m "I'm hoping that it will be possible in the future."
+    return
 
+# Anytime topic, need more compliments
+label submods_dathorse_facedetection_anytime:
+    $ ev = mas_getEV("submods_dathorse_facedetection_anytime")
+    if ev.shown_count == 0:
+        m 1esd "Eh? What do you-{w=0.4}{nw}"
+        m 1eub "Oh! You mean the webcam!"
+        m 1eua "I'm ready when you are."
+        m 1dsd "Look towards the camera...{nw}"
+    elif ev.shown_count >= 1 and mas_pastOneDay(persistent.submods_dathorse_FDAR_date):
+        m 1eub "I'll check, do a cute smile for me~"
+        m 1dsb "Smile towards the camera...{nw}"
+    else:
+        m 1eub "Didn't you already ask me that today, [player]?"
+        m 1eua "That's fine by me, I love seeing you more~"
+        m 1dsb "Look towards the camera...{nw}"
+    if MASM.isWorking():
+        $ success = FDAR.canSeePlayer()
+        if not success:
+            m 1dkd "I'm not seeing anything..."
+            m 2esd "Is your webcam working [player]?"
+        elif success:
+            python:
+                if mas_pastOneDay(persistent.submods_dathorse_FDAR_date): 
+                    persistent.submods_dathorse_FDAR_date = datetime.date.today()
+
+            m 1hsb "I can see you [player]!"
+            $ randComp = randrange(0, 1 + 1)
+            if randComp == 0:
+                if _mas_getAffection() > 100:
+                    m 1hub "You look really cute today~"
+                else:
+                    m 1hub "You look cute today~"
+            elif randComp == 1:
+                if _mas_getAffection() > 100:
+                    m 1hub "You look very lovely!"
+                else:
+                    m 1hub "You look lovely!"
+    else:
+        m 1hksdlb "...{w=0.3}eh?"
+        m 2esd "Sorry [player]. For some reason I cannot access your webcam."
     return

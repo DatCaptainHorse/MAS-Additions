@@ -46,23 +46,26 @@ def receiveData():
 			if received.startswith('{{'):
 				res = re.search("{{(.*):(.*)}}", received)
 				dictData[res.group(1)] = res.group(2).lower() in ("True", "true", "1")
-			else:
+			elif received != "ping":
 				if received in data:
 					data.remove(received)
 				data.append(received)
+			else:
+				sendData("pong")
 			commLock.release()
 		else:
 			commLock.acquire()
 			if len(data) >= 16:
 				data.pop()
 			commLock.release()
-			time.sleep(0.01)
+			time.sleep(0.01) # Ease up on the CPU
 
 def dictSend(sendKey, sendVal):
+	global commRun
 	global commLock
 	global dictData
 	global socketUDP
-	if socketUDP:
+	if socketUDP and not commRun.is_set():
 		commLock.acquire()
 		dictData[sendKey] = sendVal
 		commLock.release()
@@ -75,43 +78,51 @@ def sendData(toSend):
 		socketUDP.sendto(toSend.encode("utf-8"), ("127.0.0.1", 24488))
 
 def dictHas(dictKey):
+	global commRun
 	global commLock
 	global dictData
-	commLock.acquire()
-	res = dictData.get(dictKey, False)
-	commLock.release()
+	res = False
+	if not commRun.is_set():
+		commLock.acquire()
+		res = dictData.get(dictKey, False)
+		commLock.release()
 	return res
 
 def hasData(dat):
 	global data
+	global commRun
 	global commLock
 	res = False
-	commLock.acquire()
-	if dat in data:
-		data.remove(dat)
-		res = True
-	commLock.release()
+	if not commRun.is_set():
+		commLock.acquire()
+		if dat in data:
+			data.remove(dat)
+			res = True
+		commLock.release()
 	return res
 
 def hasDataWith(dat):
 	global data
+	global commRun
 	global commLock
 	res = None
-	commLock.acquire()
-	for fDat in data:
-		if dat in fDat:
-			data.remove(fDat)
-			res = fDat
-	commLock.release()
+	if not commRun.is_set():
+		commLock.acquire()
+		for fDat in data:
+			if dat in fDat:
+				data.remove(fDat)
+				res = fDat
+		commLock.release()
 	return res
 
 def Start():
 	global commThread
 	connectMAS()
 	commThread = threading.Thread(target = receiveData)
-	commThread.daemon = True
 	commThread.start()
 
 def OnQuit():
 	global commRun
+	global commThread
 	commRun.set()
+	commThread.join()
