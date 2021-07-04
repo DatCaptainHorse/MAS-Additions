@@ -14,9 +14,9 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 ## Downloading and Installing
 1. Go to Releases link visible on the right side.
-2. Under the latest release there text that says "Assets", click that and choose the .zip file.
-3. Extract the .zip file somewhere temporary.
-4. Installation should be as easy if you've installed Submods before. Copy Submods folder from MASM folder into MAS game folder, for other additions you want copy their respective Submods folder in as well.
+2. Under the latest release there text that says "Assets", click that and choose the archive file you want.
+3. Extract the archive file somewhere temporary.
+4. Installation should be as easy if you've installed Submods before. Copy Submods folder from the archive into MAS game folder.
 
 # Credits
 
@@ -27,4 +27,5 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 # Reporting bugs and issues
 
-Report any bugs and issues you may have to DatHorse#9516 on Discord
+Report any bugs and issues you may have to the Issues tab
+If your case is urgent. Try contacting me through DatHorse#9516 on Discord
