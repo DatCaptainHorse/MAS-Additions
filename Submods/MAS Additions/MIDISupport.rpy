@@ -10,7 +10,6 @@ init -990 python:
         name="MIDI Support",
         description=(
             "Adds MIDI keyboard support to piano.\n"
-            "Uses Monika After Story Module for receiving MIDI input."
         ),
         version="1.0.0",
         dependencies={
@@ -27,11 +26,11 @@ init 811 python:
         import threading
         import store.mas_piano_keys as mas_piano_keys
         def __init__(self, mode, pnml=None):
+            MASM.sendData("MIDI_START")
             self.MIDIThreadRun = threading.Event()
-            self.mthr = threading.Thread(target = self.midiCallback)
-            self.mthr.daemon = True
-            self.mthr.start()
-            self.midiCBKey = {}
+            self.MIDIthread = threading.Thread(target = self._MIDIcallback)
+            self.MIDIthread.start()
+            self.midiCBKeys = {}
             # MIDI key map
             self.mkeys = {
                 65: mas_piano_keys.F4,
@@ -58,55 +57,56 @@ init 811 python:
             super(PianoDisplayableOverride, self).__init__(mode, pnml)
 
         def quitflow(self):
+            MASM.sendData("MIDI_STOP")
             self.MIDIThreadRun.set()
-            renpy.music.set_volume(1.0, channel="audio")
+            self.MIDIthread.join()
+            renpy.music.set_volume(1.0, channel="audio") # Just in case
             return super(PianoDisplayableOverride, self).quitflow()
 
-        def midiCallback(self):
+        def _MIDIcallback(self):
             while not self.MIDIThreadRun.is_set():
-                if len(MASM.data) > 0:
-                    for noteVar in MASM.data:
-                        if noteVar.startswith("note"):
-                            try:
-                                splitted = noteVar.split(".")
-                                key = self.live_keymap.get(self.mkeys[int(splitted[1])], None)
-                                self.midiCBKey[key] = (splitted[0], int(splitted[2]))
-                                MASM.commLock.acquire()
-                                MASM.data.remove(noteVar)
-                                MASM.commLock.release()
+                msg, vel = MASM.hasDataWith("MIDI_NOTE")
+                if msg is not None and vel is not None:
+                    splitted = msg.split(".")
+                    if len(splitted) > 1:
+                        m = self.mkeys.get(int(splitted[1]), None)
+                        if m is not None:
+                            k = self.live_keymap.get(m, None)
+                            if k is not None:
+                                self.midiCBKeys[k] = vel
                                 renpy.redraw(self, 0)
-                            except:
-                                continue
                 else:
-                    time.sleep(0.01)
+                    time.sleep(0.01) # Smollest nap
                             
         def render(self, ev, x, y, st):
-            for key, (note, vel) in self.midiCBKey.items():
+            for k, vel in self.midiCBKeys.viewitems():
                 if len(self.played) > self.KEY_LIMIT:
                     self.played = list()
                 elif st - self.prev_time >= self.ev_timeout:
                     self._timeoutFlow()
                 self.prev_time = st
-                if note == "notedown":
-                    if not self.pressed.get(key, True):
-                        self.pressed[key] = True
+                if vel > 0:
+                    if not self.pressed.get(k, True):
+                        self.pressed[k] = True
                         self.note_hit = True
-                        self.played.append(key)
+                        self.played.append(k)
                         if self.state == self.STATE_LISTEN:
-                            self.stateListen(pygame.KEYDOWN, key)
+                            self.stateListen(pygame.KEYDOWN, k)
                         elif self.state in self.POST_STATES:
-                            self.statePost(pygame.KEYDOWN, key)
+                            self.statePost(pygame.KEYDOWN, k)
                         elif self.state in self.TRANS_POST_STATES:
-                            self.stateWaitPost(pygame.KEYDOWN, key)
+                            self.stateWaitPost(pygame.KEYDOWN, k)
                         elif self.state in self.MATCH_STATES:
-                            self.stateMatch(pygame.KEYDOWN, key)
+                            self.stateMatch(pygame.KEYDOWN, k)
+
                         renpy.music.set_volume(vel/127.0, channel="audio") # I was actually surprised this works on per-audio basis
-                        renpy.play(self.pkeys[key], channel="audio")
+                        renpy.play(self.pkeys[k], channel="audio")
                         renpy.music.set_volume(1.0, channel="audio")
-                elif note == "noteup":
-                    if self.pressed.get(key, False):
-                        self.pressed[key] = False
-                del self.midiCBKey[key]
+
+                elif vel == 0:
+                    if self.pressed.get(k, False):
+                        self.pressed[k] = False
+
             return super(PianoDisplayableOverride, self).render(ev, x, y, st)
 
     mas_override_label("mas_piano_start", "submods_dathorse_MIDI_override_piano_start")

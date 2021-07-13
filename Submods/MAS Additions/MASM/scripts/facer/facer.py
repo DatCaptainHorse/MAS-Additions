@@ -10,13 +10,28 @@ import pathlib
 
 face_recognizer_lbph = None
 face_recognizer_dnn = None
-persons = []
-facelist = []
+people = {}
 onCam = None
+
+realPath = os.path.dirname(os.path.realpath(__file__))
+face_cascade = cv2.CascadeClassifier(realPath + '/' + "haarcascade_frontalface_default.xml")
+
+# Convert image to HSV and increase V (brightness) by value
+# Returns image with increased brightness
+def increase_brightness(image, value):
+	if value > 0:
+		hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+		h, s, v = cv2.split(hsv)
+		limit = 255 - value
+		v[v > limit] = 255
+		v[v <= limit] += value
+		hsv = cv2.merge((h, s, v))
+		image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+	return image
 
 def camOn():
 	global onCam
-	if onCam == None:
+	if onCam is None:
 		onCam = cv2.VideoCapture(0)
 
 	if not onCam.isOpened():
@@ -28,7 +43,7 @@ def camOn():
 
 def camOff():
 	global onCam
-	if onCam == None:
+	if onCam is None:
 		return True
 
 	if onCam.isOpened():
@@ -38,72 +53,106 @@ def camOff():
 
 	return False
 
-def camFrame():
+class LightLevelLow(Exception):
+	pass
+
+# Returns frame on success, None if camera cannot be opened or None if reading frame failed
+# Parameter minLightLevel specifies the minimum brightness allowed, if brightness is too low LightLevelLow is thrown
+def camFrame(minLightLevel = 0):
 	global onCam
-	if not onCam.isOpened():
-		print("Error: Camera no longer open")
-		return False
+	if not onCam or not onCam.isOpened():
+		print("Error: Camera not open")
+		return None
 
 	ret, frame = onCam.read()
-	if not ret:
+	if not ret or frame is None:
 		return None
-	else:
-		return frame
 
-	return False
+	if minLightLevel > 0:
+		if np.mean(frame) < minLightLevel:
+			raise LightLevelLow
 
-# Takes pictures with the webcam and saves them to the output directory, used for training
-def take_faces(personName, count, delay = 0.01, savePicturePath = None):
-	global facelist
-	global persons
-	camOn()
+	return frame
+
+# Takes pictures with webcam, used for training, if count is 0 timeout is used as main count
+# If minLightLevel is greater than 0 and it's not hit, LightLevelLow is thrown
+def take_faces(personName, count = 100, timeout = 3, savePicturePath = None, recreate = False, useDNN = False, minLightLevel = 0):
+	global people
 	completed = 0
-	while (completed < count):
-		print ("Taking picture: {}/{}".format(completed + 1, count), end="\r")
-		frame = camFrame()
+	if recreate is True:
+		people = {}
+
+	facelist = []
+	startTime = time.time()
+	while time.time() - startTime < timeout:
+		dt = time.time()
+		if count > 0 and completed >= count:
+			break
+
+		if count > 0:
+			print (f"Taking frame: {completed + 1}/{count}", end="\r")
+		else:
+			print (f"Taking frame: {completed + 1}", end="\r")
+
+		try:
+			frame = camFrame(minLightLevel)
+		except LightLevelLow:
+			raise
+
 		if frame is None:
+			timeout += time.time() - dt
 			continue
 
 		# Use DNN for taking faces always, way more accurate even if it takes longer
-		faces = detect_faces_dnn(frame)
-		if not faces:
+		faces = None
+		if useDNN:
+			faces = detect_faces_dnn(frame)
+		else:
+			faces = detect_faces_haar(frame)
+
+		if faces is None or len(faces) == 0:
+			timeout += time.time() - dt
 			continue
 
-		if len(faces) > 0:
-			facelist.append(faces[0])
-			if savePicturePath:
-				try:
-					cv2.imwrite(os.path.join(savePicturePath, "face_{}.png".format(completed)), faces[0])
-				except:
-					break
-			completed += 1
-		# Wait a bit
-		time.sleep(delay)
-	persons.append(personName)
+		facelist.append((personName, faces[0]))
+		if savePicturePath:
+			try:
+				cv2.imwrite(os.path.join(savePicturePath, "face_{}.png".format(completed)), faces[0])
+			except Exception as e:
+				print(f"Failed to save frame: {e}")
+				return False
+				
+		completed += 1
+
 	print("\n")
-	camOff()
-	return completed == count
+	if len(facelist) > 0:
+		people[len(people)] = facelist
+	else:
+		print("List empty after take")
+		return False
+
+	if count > 0:
+		return completed == count
+	else:
+		return True
 
 # Detect any faces inside an image using haar cascades
 # returns the face area images in gray and face rectangles
 def detect_faces_haar(img, sceneGray = True):
+	global realPath
+	global face_cascade
 	# Get the gray from image and equalize it
 	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	gray = cv2.equalizeHist(gray)
 	
-	# Load haar face cascade
-	realPath = os.path.dirname(os.path.realpath(__file__))
-	face_cascade = cv2.CascadeClassifier(realPath + '/' + "haarcascade_frontalface_default.xml")
-
 	# Detect faces with multiscale haar
-	faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5)
+	faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 	
 	# No faces? Return nothing
-	if (len(faces) == 0):
+	if len(faces) == 0:
 		return None
 
 	grays = []
-	
 	for face in faces:
 		(x, y, w, h) = face
 
@@ -114,8 +163,9 @@ def detect_faces_haar(img, sceneGray = True):
 			area = img[y:y+w, x:x+h]
 			grayArea = cv2.cvtColor(area, cv2.COLOR_BGR2GRAY)
 			grayArea = cv2.equalizeHist(grayArea)
-			
-		grays.append(grayArea)
+		
+		if grayArea is not None:
+			grays.append(grayArea)
 	
 	return grays
 
@@ -123,14 +173,14 @@ def detect_faces_haar(img, sceneGray = True):
 # uses pre-trained caffe models and protos
 # returns the face area images in gray and face rectangles
 def detect_faces_dnn(img, sceneGray = True):
+	global realPath
 	global face_recognizer_dnn
-	realPath = os.path.dirname(os.path.realpath(__file__))
 	# Load pre-trained model
 	if face_recognizer_dnn is None:
-		print ("Loading pre-trained model")
+		print ("Loading caffe model")
 		face_recognizer_dnn = cv2.dnn.readNetFromCaffe(realPath + '/' + "MobileNet-SSD.prototxt", realPath + '/' + "MobileNet-SSD.caffemodel")
 
-	# Resize image and blob it!
+	# Resize image and blob it
 	(h, w) = img.shape[:2]
 	resizedImg = cv2.resize(img, (224, 224))
 	blobbed = cv2.dnn.blobFromImage(resizedImg, 1, (224, 224), (104, 117, 123))
@@ -140,7 +190,7 @@ def detect_faces_dnn(img, sceneGray = True):
 	faces = face_recognizer_dnn.forward()
 	
 	# No faces? Return nothing
-	if (len(faces) == 0):
+	if len(faces) == 0:
 		return None
 	
 	areas = []
@@ -162,28 +212,30 @@ def detect_faces_dnn(img, sceneGray = True):
 			cropped = img[sY:eY, sX:eX]
 			grayed = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 			grayed = cv2.equalizeHist(grayed)
-		areas.append(grayed)
+
+		if grayed is not None:
+			areas.append(grayed)
+		
 	return areas
 		
 # Trains using taken data or images inside a folder, images must be in their own subfolder named after the person
 # ex. images/MyName, and you give it "images" directory as the data_folder
-def train_faces_lbph(data_folder = None):
+def train_faces_lbph(data_folder = None, recreate = False):
+	global people
 	global face_recognizer_lbph
-	global facelist
-	labels = []
-	if not face_recognizer_lbph:
+	requireOneTime = False
+	if face_recognizer_lbph is None or recreate is True:
+		requireOneTime = True
 		face_recognizer_lbph = cv2.face.LBPHFaceRecognizer_create()
-
+		
 	if data_folder:
-		x = 0
 		subdirs = os.listdir(data_folder)
 		for subdir in subdirs:
-			label = x
-			persons.append(subdir)
 			print("Preparing LBPH from images of {}".format(subdir))
 			fileDir = os.path.join(data_folder, subdir)
 			files = os.listdir(fileDir)
 			pSize = len(files)
+			facelist = []
 			for i, file in enumerate(files):
 				# Prevent issues with files starting with a dot and non-image files
 				if file.startswith(".") or not file.lower().endswith((".png", ".jpg", ".jpeg")):
@@ -193,61 +245,78 @@ def train_faces_lbph(data_folder = None):
 				image = cv2.imread(image_path)
 
 				print("Progress: {}/{} images".format(i + 1, pSize), end="\r")
+				if image is not None:
+					facelist.append((subdir, image))
 
-				if image:
-					#image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) Already gray from HAAR
-					labels.append(label)
-					facelist.append(image)
+			if len(facelist) > 0:
+				people[len(people)] = facelist
+			else:
+				print("Error: facelist empty loading from folder")
 
-			x = x + 1
 			print('\n')
 	else:
 		print("Preparing LBPH from data")
-		for f in facelist:
-			labels.append(0)
 		
-	if len(facelist) <= 0 or len(labels) != len(facelist):
+	if len(people) == 0:
 		print("Failed to prepare data")
 		return False
 
 	print("Training LBPH.. ", end="")
 	try:
-		face_recognizer_lbph.train(facelist, np.array(labels))
+		for k, v in people.items():
+			labels = []
+			datalist = []
+			for n, d in v:
+				if d is not None:
+					labels.append(k)
+					datalist.append(d)
+
+			if len(labels) > 0 and len(datalist) > 0:
+				if requireOneTime is True:
+					requireOneTime = False
+					face_recognizer_lbph.train(datalist, np.array(labels))
+					print("Trained")
+				else:
+					face_recognizer_lbph.update(datalist, np.array(labels))
+					print("Updated")
+			else:
+				print("Error: Empty or mismatched data")
 	except Exception as e:
-		print("Failed, reason: {}".format(str(e)))
+		print(f"Failed, reason: {e}")
 		return False
 
-	print("Success")
 	return True
 
-# Save trained LBPH recognition algorithm
+# Save trained LBPH recognition data
 # requires that you train LBPH first
 def save_trained_lbph(save_dir):
 	global face_recognizer_lbph
-	print("Saving LBPH.. ", end='')
+	print("Saving LBPH.. ", end="")
 	if not face_recognizer_lbph:
 		print("Unable to save. LBPH recognizer not trained yet")
 		return
 	try:
 		face_recognizer_lbph.write(save_dir)
+		print("Success")
 	except Exception as e: 
-		print("Unable to save. Reason: {}".format(e))
-		return
-		
-	print("Success")
+		print(f"Unable to save. Reason: {e}")
 	
-# Load trained LBPH recognition algorithm
+# Load trained LBPH recognition data
 # you need to give namelist with correct indices
 def load_trained_lbph(load_dir, namelist):
+	global people
 	global face_recognizer_lbph
-	global persons
-	persons = namelist
+	for name in namelist:
+		people[len(people)] = [(name, None)]
+
 	print("Loading LBPH.. ", end="")
 	if not face_recognizer_lbph:
 		face_recognizer_lbph = cv2.face.LBPHFaceRecognizer_create()
-		
-	face_recognizer_lbph.read(load_dir)
-	print("Success")
+	try:
+		face_recognizer_lbph.read(load_dir)
+		print("Success")
+	except Exception as e:
+		print(f"Exception on load: {e}")
 	
 # Attempts to recognize lbph trained faces within input image
 # returns boolean if any face is detected and tuple of recognized faces
@@ -256,23 +325,38 @@ def load_trained_lbph(load_dir, namelist):
 # higher value is lower tolerance, meaning random faces 
 # could be recognized as other people
 def recognize_faces_lbph(image, threshold = 0.8, useDNN = False):
-	global persons
+	global people
 	if image is not None:
-		faces = None
-		if useDNN:
-			faces = detect_faces_dnn(image, True)
+		try:
+			if useDNN:
+				faces = detect_faces_dnn(image)
+			else:
+				faces = detect_faces_haar(image)
+		except Exception as e:
+			print(f"Detection error: {e}")
+			return False, None
 		else:
-			faces = detect_faces_haar(image, True)
-		
-		recognized = []
-		if faces:
-			for face in faces:
-				label, difference = face_recognizer_lbph.predict(face)
-				if difference < (threshold * 100):
-					name = persons[label]
-					recognized.append(tuple((name, face, difference)))
-				else:
-					recognized.append(tuple((None, face, difference)))
-			
-		return True, recognized
+			if faces is not None:
+				found = False
+				recognized = []
+				for face in faces:
+					try:
+						label, difference = face_recognizer_lbph.predict(face)
+					except Exception as e:
+						print(f"Could not predict: {e}")
+						return False, None
+					else:
+						try:
+							found = True
+							if difference < (threshold * 100) and len(people[label][0]) > 0:
+								name = people[label][0][0]
+								recognized.append((name, face))
+							else:
+								recognized.append((None, face))
+						except Exception as e:
+							print(f"Exception on recognized append: {e}")
+							return False, None
+				return found, recognized
+			return False, None
+		return False, None
 	return False, None

@@ -2,127 +2,104 @@
 # TODO: Ping-Pong alive check messages
 import re
 import time
+import json
+import errno
 import socket
 import threading
 
-data = []
-dictData = {}
-socketUDP = None
+data = {}
 commThread = None
+serverSocket = None
 commRun = threading.Event()
 commLock = threading.Lock()
 
 def connectMAS():
 	global data
-	global socketUDP
-	if not socketUDP:
-		SE.Log("Creating socket..")
-		socketUDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		socketUDP.settimeout(0.1)
-		socketUDP.bind(("127.0.0.1", 24489))
-		SE.Log("Done")
-		execs = 0
-
-def receiveData():
-	global data
-	global commRun
-	global dictData
-	global commLock
-	global socketUDP
-	while not commRun.is_set():
-		received = None
+	global serverSocket
+	if serverSocket is None:
 		try:
-			recv, addr = socketUDP.recvfrom(128)
-			received = recv.decode("utf-8")
+			SE.Log("Creating server socket..")
+			serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+			serverSocket.settimeout(0.1)
+			serverSocket.bind(("127.0.0.1", 24489))
+			SE.Log("Done, sending ready message..")
+			serverSocket.sendto(json.dumps(("MASM_READY", True)).encode("utf-8"), ("127.0.0.1", 24488))
+			SE.Log("Done")
+		except Exception as e:
+			SE.Log(f"Creating socket exception: {e}")
+
+def _receiveData():
+	global data
+	global commRun
+	global commLock
+	global serverSocket
+	while not commRun.is_set():
+		try:
+			recv, addr = serverSocket.recvfrom(256)
+			if recv is not None:
+				recv = json.loads(recv.decode("utf-8"))
+				SE.Log(f"Received: {recv}")
+				if recv[0] == "ping":
+					sendData("pong")
+				else:
+					with commLock:
+						data[recv[0]] = recv[1]
 		except socket.timeout:
-			pass # No data
+			continue # No data
 		except socket.error as e:
-			SE.Log(f"socketer socket error : {str(e)}")
-			pass # Log but pass
+			SE.Log(f"Socket receive error: {e}") # Log but pass
+		except Exception as e:
+			SE.Log(f"Socketer socket exception: {e}")
 
-		if received:
-			print(f"Received: {received}")
-			commLock.acquire()
-			if received.startswith('{{'):
-				res = re.search("{{(.*):(.*)}}", received)
-				dictData[res.group(1)] = res.group(2).lower() in ("True", "true", "1")
-			elif received != "ping":
-				if received in data:
-					data.remove(received)
-				data.append(received)
-			else:
-				sendData("pong")
-			commLock.release()
-		else:
-			commLock.acquire()
-			if len(data) >= 16:
-				data.pop()
-			commLock.release()
-			time.sleep(0.01) # Ease up on the CPU
+def sendData(sendKey, sendValue = True):
+	global serverSocket
+	if serverSocket is not None:
+		#SE.Log(f"Sending: {sendKey}")
+		serverSocket.sendto(json.dumps((sendKey, sendValue)).encode("utf-8"), ("127.0.0.1", 24488))
 
-def dictSend(sendKey, sendVal):
-	global commRun
-	global commLock
-	global dictData
-	global socketUDP
-	if socketUDP and not commRun.is_set():
-		commLock.acquire()
-		dictData[sendKey] = sendVal
-		commLock.release()
-		toSend = ("{{" + sendKey + ":" + sendVal + "}}")
-		socketUDP.sendto(toSend.encode("utf-8"), ("127.0.0.1", 24488))
-
-def sendData(toSend):
-	global socketUDP
-	if socketUDP:
-		socketUDP.sendto(toSend.encode("utf-8"), ("127.0.0.1", 24488))
-
-def dictHas(dictKey):
-	global commRun
-	global commLock
-	global dictData
-	res = False
-	if not commRun.is_set():
-		commLock.acquire()
-		res = dictData.get(dictKey, False)
-		commLock.release()
-	return res
-
-def hasData(dat):
+def hasDataWith(dictKey):
 	global data
-	global commRun
-	global commLock
-	res = False
-	if not commRun.is_set():
-		commLock.acquire()
-		if dat in data:
-			data.remove(dat)
-			res = True
-		commLock.release()
-	return res
-
-def hasDataWith(dat):
-	global data
-	global commRun
 	global commLock
 	res = None
-	if not commRun.is_set():
-		commLock.acquire()
-		for fDat in data:
-			if dat in fDat:
-				data.remove(fDat)
-				res = fDat
-		commLock.release()
+	with commLock:
+		try:
+			res = next(((k, v) for k, v in data.items() if k.startswith(dictKey)), None)
+			if res[0] is not None:
+				del data[res[0]]
+		except:
+			res = (None, None)
+	return res
+
+def hasDataValue(dictKey):
+	global data
+	global commLock
+	res = None
+	with commLock:
+		res = data.get(dictKey, None)
+		if res is not None:
+			del data[dictKey]
+	return res
+
+def hasDataBool(dictKey):
+	global data
+	global commLock
+	res = False
+	with commLock:
+		if dictKey in data:
+			res = True
+			del data[dictKey]
 	return res
 
 def Start():
 	global commThread
 	connectMAS()
-	commThread = threading.Thread(target = receiveData)
+	commThread = threading.Thread(target = _receiveData)
 	commThread.start()
 
 def OnQuit():
 	global commRun
 	global commThread
+	global serverSocket
 	commRun.set()
 	commThread.join()
+	serverSocket = None

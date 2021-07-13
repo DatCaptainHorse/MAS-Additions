@@ -2,7 +2,7 @@
 Safety
 ------
 Are you worried about the executable? If so you can ask me to provide source code for the application.
-The engine is not open-source however, if you are not part of MAS team, you will need a good reason to see it's source.
+The engine is not open-source however, if you are not part of the MAS team, you will need a good reason to see it's source.
 
 Discord: DatHorse#9516
 
@@ -20,7 +20,8 @@ Application hooks:
 Callable functions:
 	SE.Log("log text") # Log something
 	 
-Try to write non-blocking code if possible so you won't block the execution of other scripts. Or use Python's threads to get your work off main loops.
-ie. don't use never-ending while or for loops in Start function. Treat the Update, Render and Tick functions as big while/for loops for your code.
+Try to write non-blocking code if possible so you won't block the execution of other scripts or use Python's threads to get your work off hooks.
+ie. Treat the Update, Render and Tick functions as big while loops to be shared by all scripts.
 
-The engine will try to catch up in missed function calls (ex. Tick could run many times per second for brief moment)
+If you use threads with loops for checking if socketer has data, add atleast 0.01s (higher the better) of sleeping between checks.
+It's because checking for data will block other scripts from trying to check data at the same time.

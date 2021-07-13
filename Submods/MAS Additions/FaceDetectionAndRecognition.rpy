@@ -2,8 +2,18 @@
 # 0.1.8 -> 2.0.0
 # - Better versioning
 # - Using official Submod API
-# - HAAR and DNN changing with recognition timeout for better user experience
+# - Bunch of changeable settings and buttons!
+# - Semi-continuous recognition for less freezing
+# - New and updated topics
+# - Different responses, Monika can tell you to turn on the lights
+# - Painful amount of testing, I really hope stuff works..
+
 default persistent.submods_dathorse_FDAR_date = None
+default persistent.submods_dathorse_FDAR_todayNotified = False # Don't keep notifying on alltime topic about doing it on same day
+default persistent.submods_dathorse_FDAR_allowAccess = False
+default persistent.submods_dathorse_FDAR_detectionMethod = "HAAR" # Default to HAAR for faster recognition
+default persistent.submods_dathorse_FDAR_detectionTimeout = 15 # 15 seconds should be good enough, user can adjust if needed
+default persistent.submods_dathorse_FDAR_memoryTimeout = 5 # 5 seconds of data, might be enough for most?
 
 init -990 python:
     store.mas_submod_utils.Submod(
@@ -11,7 +21,8 @@ init -990 python:
         name="Face Detection and Recognition",
         description=(
             "Adds facial detection and recognition functionality to MAS.\n"
-            "Uses OpenCV for the process. This is done through Monika After Story Module."
+            "Adds 2 topics, 'Webcam' (1-time-only) and\n"
+            "'How do I look?' which is visible after first topic, under 'Mod' category\n"
         ),
         version="2.0.0",
         dependencies={
@@ -21,66 +32,269 @@ init -990 python:
         version_updates={}
     )
 
-init 5 python:
-    import datetime
-    from random import randrange
-    if persistent.submods_dathorse_FDAR_date is None: # If not initialized yet, set as yesterday so rest goes smoothly
-        persistent.submods_dathorse_FDAR_date = datetime.date.today() - datetime.timedelta(days=1)
-
-    addEvent(
-        Event(
-            persistent.event_database,
-            eventlabel="submods_dathorse_facedetection_firsttime",
-            category=["mod"],
-            prompt="Webcam",
-            random=False,
-            unlocked=True,
-            pool=True,
-            aff_range=(mas_aff.NORMAL, None)
-        )
-    )
-
-    addEvent(
-        Event(
-            persistent.event_database,
-            eventlabel="submods_dathorse_facedetection_anytime",
-            category=["mod"],
-            prompt="How do I look?",
-            random=False,
-            unlocked=False,
-            pool=False,
-            aff_range=(mas_aff.NORMAL, None)
-        )
-    )
-
 init -990 python:
     import time
+    import atexit
     import threading
-    FDAR_timeout = "15" # Has to be global for screen input to work
     # Face Detection and Recognition functions
     class FDAR:
-        method = "DNN" # Default to DNN for better results
-        # Sends a request to detect player's face, if no face data exists it will be taken first.
-        # Returns boolean True or False depending if player's face was detected, or False if timeout was triggered (by default 15 seconds, user adjustable)
+        status = None
+        statusThread = None
+        statusThreadEvent = None
+        workaroundAllowState = False
+        stateMachine = { "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False }
+        # Screen update function
+        # This is for internal use.
         @staticmethod
-        def canSeePlayer():
-            startTime = time.time()
-            MASM.sendData("recognizeFace.{}".format(FDAR.method))
-            while time.time() - startTime < int(FDAR_timeout): # timeout after which we simply fail
-                if MASM.hasData("seeYou"):
-                    return True
-                elif MASM.hasData("cantSee"):
-                    return False
-                time.sleep(0.1) # Just to ease up on the loop
-            return False
+        def _updateLoop():
+            coolDots = "."
+            lastTime = time.time()
+            while FDAR.stateMachine["PREPARING"]:
+                if MASM.hasDataBool("FDAR_FAILURE"):
+                    FDAR.stateMachine["PREPARING"] = False
+                    FDAR.status = "Preparing failed"
+                    renpy.restart_interaction()
+                elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT"):
+                    FDAR.stateMachine["PREPARING"] = False
+                    FDAR.status = "Not enough light"
+                    renpy.restart_interaction()
+                elif MASM.hasDataBool("FDAR_PREPARING_DONE"):
+                    FDAR.stateMachine["PREPARING"] = False
+                    FDAR.status = "Ready!"
+                    renpy.restart_interaction()
+                elif FDAR.stateMachine["PREPARING"]:
+                    FDAR.status = "Preparing data, please wait{}".format(coolDots)
+                    renpy.restart_interaction()
+                    if time.time() - lastTime > 1.0: # Dotteroni
+                        if len(coolDots) < 3:
+                            coolDots += "."
+                        else:
+                            coolDots = "."
+                        lastTime = time.time()
+                time.sleep(0.1) # Nep
+
+        # Starts screen-update thread until not needed anymore
+        # This is for internal use.
+        @staticmethod
+        def _startScreenUpdate():
+            #if FDAR.statusThread is None:
+            FDAR.statusThreadEvent = threading.Event()
+            FDAR.statusThread = threading.Thread(target = FDAR._updateLoop)
+            FDAR.statusThread.daemon = True
+            FDAR.statusThread.start()
+
+        # Sets persistents
+        # This is for internal use.
+        @staticmethod
+        @MASM.atStart
+        def _applyPersistents():
+            FDAR.status = None
+            FDAR.workaroundAllowState = False
+            FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
+            FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
+            FDAR._setDetectionMethod(persistent.submods_dathorse_FDAR_detectionMethod)
+            FDAR._setAllowAccess(persistent.submods_dathorse_FDAR_allowAccess)
+            FDAR.stateMachine["PREPARING"] = True
+            FDAR._startScreenUpdate()
         
-        # Switches detection between DNN and HAAR
+        # Closes necessary things at exit
+        # This is for internal use.
+        #@staticmethod
+        #@atexit.register
+        #def _atExit():
+        #    FDAR.statusThreadEvent.set()
+        #    FDAR.statusThread.join()
+
+        # Request to memorize player
+        # This is for internal use.
         @staticmethod
-        def switchDetectionMethod():
-            if FDAR.method == "HAAR":
-                FDAR.method = "DNN"
+        def _memorizePlayer(removeOld = False, duringRecognize = False):
+            if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess:
+                FDAR.status = "Memorize requested"
+                if not duringRecognize:
+                    FDAR.stateMachine["PREPARING"] = True
+                    FDAR._startScreenUpdate()
+                if removeOld:
+                    MASM.sendData("FDAR_MEMORIZE", True)
+                else:
+                    MASM.sendData("FDAR_MEMORIZE", False)
+
+        # Sets whether webcam access is allowed or not.
+        # This is mainly for internal use. However if you wish to have dialogue where Monika changes access herself, it's fine to use this.
+        @staticmethod
+        def _setAllowAccess(allowed):
+            if not FDAR.stateMachine["PREPARING"]:
+                if allowed and not FDAR.workaroundAllowState:
+                    MASM.sendData("FDAR_ALLOWACCESS", allowed)
+                    FDAR.status = "Access allowed"
+                    FDAR.workaroundAllowState = True
+                    FDAR.stateMachine["PREPARING"] = True
+                    FDAR._startScreenUpdate()
+                elif not allowed:
+                    MASM.sendData("FDAR_ALLOWACCESS", allowed)
+                    FDAR.status = "Access not allowed"
+                    FDAR.workaroundAllowState = False
+                persistent.submods_dathorse_FDAR_allowAccess = allowed
+
+        # Switches whether webcam access is allowed or not.
+        # This is for internal use.
+        @staticmethod
+        def _switchAllowAccess():
+            if not FDAR.stateMachine["PREPARING"]:
+                if not persistent.submods_dathorse_FDAR_allowAccess:
+                    persistent.submods_dathorse_FDAR_allowAccess = True
+                else:
+                    persistent.submods_dathorse_FDAR_allowAccess = False
+                FDAR._setAllowAccess(persistent.submods_dathorse_FDAR_allowAccess)
+
+        # Sets timeout.
+        # This is for internal use.
+        @staticmethod
+        def _setTimeout(timeout):
+            if not FDAR.stateMachine["PREPARING"]:
+                MASM.sendData("FDAR_SETTIMEOUT", timeout)
+                persistent.submods_dathorse_FDAR_detectionTimeout = timeout
+
+        # Switches timeout.
+        # This is for internal use
+        @staticmethod
+        def _switchTimeout():
+            if not FDAR.stateMachine["PREPARING"]:
+                if persistent.submods_dathorse_FDAR_detectionTimeout == 5:
+                    persistent.submods_dathorse_FDAR_detectionTimeout = 10
+                elif persistent.submods_dathorse_FDAR_detectionTimeout == 10:
+                    persistent.submods_dathorse_FDAR_detectionTimeout = 15
+                elif persistent.submods_dathorse_FDAR_detectionTimeout == 15:
+                    persistent.submods_dathorse_FDAR_detectionTimeout = 20
+                elif persistent.submods_dathorse_FDAR_detectionTimeout == 20:
+                    persistent.submods_dathorse_FDAR_detectionTimeout = 25
+                else:
+                    persistent.submods_dathorse_FDAR_detectionTimeout = 5
+                FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
+
+        # Set chose memory timeout
+        # This is for internal use.
+        @staticmethod
+        def _setMemoryTimeout(timeout):
+            if not FDAR.stateMachine["PREPARING"]:
+                MASM.sendData("FDAR_SETMEMORYTIMEOUT", timeout)
+
+        # Switches memory timeout
+        # This is for internal use
+        @staticmethod
+        def _switchMemoryTimeout():
+            if not FDAR.stateMachine["PREPARING"]:
+                if persistent.submods_dathorse_FDAR_memoryTimeout == 5:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 10
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 10:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 15
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 15:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 20
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 20:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 25
+                else:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 5
+                FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
+
+        # Sets detection method, for internal use
+        @staticmethod
+        def _setDetectionMethod(method):
+            if not FDAR.stateMachine["PREPARING"]:
+                MASM.sendData("FDAR_DETECTIONMETHOD", method)
+                persistent.submods_dathorse_FDAR_detectionMethod = method
+
+        # Switches detection, for internal use
+        @staticmethod
+        def _switchDetectionMethod():
+            if not FDAR.stateMachine["PREPARING"]:
+                if persistent.submods_dathorse_FDAR_detectionMethod == "HAAR":
+                    persistent.submods_dathorse_FDAR_detectionMethod = "DNN"
+                else:
+                    persistent.submods_dathorse_FDAR_detectionMethod = "HAAR"
+                FDAR._setDetectionMethod(persistent.submods_dathorse_FDAR_detectionMethod)
+
+        # Just short for FDAR_allowAccess
+        # Returns True if player has allowed webcam access or False otherwise
+        @staticmethod
+        def allowedToRecognize():
+            return persistent.submods_dathorse_FDAR_allowAccess
+
+        # If we are able to recognize.
+        # Returns False if re-memorize is running, access is disabled or MASM is not working, True otherwise
+        @staticmethod
+        def canRecognize():
+            if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
+                return True
             else:
-                FDAR.method = "HAAR"
+                return False
+
+        # Parameter person, name of person to look for, default is "Player"
+        # Returns 1 if person's face was recognized or 0 if an error occurred, webcam access is disabled or MASM isn't running. 
+        # Can also return -1 if low-light is an issue, -2 if waiting needs to be done.
+        lightTime = None
+        timeoutTime = None
+        sayLightOnce = False
+        extraTimeOnce = False
+        @staticmethod
+        def canSee(person = "Player"):
+            if not MASM.isWorking():
+                return 0
+            elif FDAR.canRecognize():
+                if not FDAR.stateMachine["RECOGNIZING"] and not FDAR.stateMachine["MEMORIZING"]:
+                    MASM.sendData("FDAR_RECOGNIZEONCE", person)
+                    FDAR.stateMachine["RECOGNIZING"] = True
+                    FDAR.timeoutTime = time.time()
+                    FDAR.extraTimeOnce = False
+                    FDAR.sayLightOnce = False
+                    FDAR.lightTime = None
+
+                while time.time() - FDAR.timeoutTime < persistent.submods_dathorse_FDAR_detectionTimeout and MASM.isWorking():
+                    if FDAR.stateMachine["MEMORIZING"]:
+                        if MASM.hasDataBool("FDAR_PREPARING_DONE"):
+                            FDAR.stateMachine["MEMORIZING"] = False
+                            return -2
+                        elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT"):
+                            FDAR._memorizePlayer(duringRecognize = True) # Keep trying
+                            if not FDAR.sayLightOnce:
+                                FDAR.sayLightOnce = True
+                                FDAR.lightTime = time.time()
+                                return -1
+                        elif FDAR.lightTime is not None and time.time() - FDAR.lightTime > 5: # Workaround to return back to "this might take a while" if lights are good now
+                            FDAR.lightTime = None
+                            if FDAR.sayLightOnce:
+                                FDAR.sayLightOnce = False
+                                return -2
+                    elif FDAR.stateMachine["RECOGNIZING"]:
+                        if MASM.hasDataBool("FDAR_NOTMEMORIZED"):
+                            FDAR.stateMachine["MEMORIZING"] = True
+                            FDAR.stateMachine["RECOGNIZING"] = False
+                            FDAR._memorizePlayer(duringRecognize = True)
+                            if not FDAR.extraTimeOnce:
+                                FDAR.extraTimeOnce = True
+                                FDAR.timeoutTime += persistent.submods_dathorse_FDAR_memoryTimeout # Some extra time
+                                return -2
+                        elif MASM.hasDataBool("FDAR_LOWLIGHT"):
+                            return -1
+                        elif MASM.hasDataBool("FDAR_FAILURE"):
+                            FDAR.stateMachine["RECOGNIZING"] = False
+                            FDAR.stateMachine["MEMORIZING"] = False
+                            return 0
+                        elif MASM.hasDataValue("FDAR_RECOGNIZED") == person:
+                            FDAR.stateMachine["RECOGNIZING"] = False
+                            FDAR.stateMachine["MEMORIZING"] = False
+                            return 1
+
+                    time.sleep(0.1) # Just to ease up on the loop
+
+                FDAR.stateMachine["RECOGNIZING"] = False
+                FDAR.stateMachine["MEMORIZING"] = False
+                MASM.sendData("FDAR_RECOGNIZESTOP")
+                FDAR.extraTimeOnce = False
+                FDAR.sayLightOnce = False
+                FDAR.lightTime = None
+                return 0 # Return failure if timeout happened
+            else:
+                return -2
 
 screen FDAR_settings_pane():
     python:
@@ -89,110 +303,61 @@ screen FDAR_settings_pane():
             _tooltip = submods_screen.scope.get("tooltip", None)
         else:
             _tooltip = None
+
+        if FDAR.status is not None:
+            statusStr = FDAR.status
+        else:
+            statusStr = "Not ready"
     vbox:
         box_wrap False
         xfill True
         xmaximum 1000
         style_prefix "check"
+
+        text "FDAR Status: [statusStr]"
+
+        if _tooltip:
+            textbutton _("Allow webcam access: {}".format(persistent.submods_dathorse_FDAR_allowAccess)):
+                action Function(FDAR._switchAllowAccess)
+                hovered SetField(_tooltip, "value", "Toggle whether to allow access to your webcam.")
+                unhovered SetField(_tooltip, "value", _tooltip.default)
+        else:
+            textbutton _("Allow webcam access: {}".format(persistent.submods_dathorse_FDAR_allowAccess)):
+                action Function(FDAR._switchAllowAccess)
+                
+        if _tooltip:
+            textbutton _("Detection method: {}".format(persistent.submods_dathorse_FDAR_detectionMethod)):
+                action Function(FDAR._switchDetectionMethod)
+                hovered SetField(_tooltip, "value", "HAAR is faster and better with low-light, but is less accurate. DNN is slower and bad with low-light, but is more accurate.")
+                unhovered SetField(_tooltip, "value", _tooltip.default)
+        else:
+            textbutton _("Detection method: {}".format(persistent.submods_dathorse_FDAR_detectionMethod)):
+                action Function(FDAR._switchDetectionMethod)
+
         hbox:
             if _tooltip:
-                textbutton _("Face detection method: {}".format(FDAR.method)):
-                    action Function(FDAR.switchDetectionMethod)
-                    hovered SetField(_tooltip, "value", "HAAR is faster but less accurate, DNN is slower but more accurate")
+                textbutton _("Recognize timeout: {}s".format(persistent.submods_dathorse_FDAR_detectionTimeout)):
+                    action Function(FDAR._switchTimeout)
+                    hovered SetField(_tooltip, "value", "How long will Monika try to see you before giving up, best to keep default unless Monika has trouble seeing you.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
-                textbutton _("Face detection method: {}".format(FDAR.method)):
-                    action Function(FDAR.switchDetectionMethod)
-        hbox:
-            text "Detection timeout:"
-            input:
-                allow "0123456789" 
-                length 2
-                value VariableInputValue("FDAR_timeout")
+                textbutton _("Recognize timeout: {}s".format(persistent.submods_dathorse_FDAR_detectionTimeout)):
+                    action Function(FDAR._switchTimeout)
 
-# Initial face-detection topic
-label submods_dathorse_facedetection_firsttime:
-    m 1eub "It would be nice if I could see you [player]."
-    if MASM.isWorking():
-        m 2eud "Wait I could..."
-        menu:
-            m "[player] do you have a webcam?"
-            "Yes":
-                m 1eub "That's great!"
-                m 1esb "[player] would you be fine if I accessed your webcam for a moment?"
-                menu:
-                    "Yes":
-                        m 2esb "Please make sure it is working before I attempt this."
-                        m 1eub "I'm ready when you are."
-                        m 1dsd "Please look towards the camera...{nw}"
-                        $ success = FDAR.canSeePlayer()
-                        if not success:
-                            m 1dkd "Eh? Something went wrong..."
-                            m 2esd "Well it was a good try!"
-                            m 2eub "I love you [player]."
-                            m 1eua "No matter what you look like."
-                            $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
-                            $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
-                        elif success:
-                            m 1hsb "I can see you!"
-                            m 1hksdlb "Ah..."
-                            m 2esb "I could see you for a while [player]."
-                            m 2ekb "But I lost my focus as I tried to reach out for you..."
-                            m 1hub "You are cute, [player]!"
-                            $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
-                            $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
-                    "No":
-                        m 2esb "If you change your mind later, just ask me."
-                        m 1eub "You don't have to be shy."
-                        $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
-                        $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
-            "No":
-                m 1eub "That's fine."
-                m 1hub "Knowing that you are there for me is more than enough."
-                $ mas_hideEVL("submods_dathorse_facedetection_firsttime", "EVE", depool=True)
-                $ mas_showEVL("submods_dathorse_facedetection_anytime", "EVE", unlock=True, _pool=True)
-    else:
-        m "I'm hoping that it will be possible in the future."
-    return
-
-# Anytime topic, need more compliments
-label submods_dathorse_facedetection_anytime:
-    $ ev = mas_getEV("submods_dathorse_facedetection_anytime")
-    if ev.shown_count == 0:
-        m 1esd "Eh? What do you-{w=0.4}{nw}"
-        m 1eub "Oh! You mean the webcam!"
-        m 1eua "I'm ready when you are."
-        m 1dsd "Look towards the camera...{nw}"
-    elif ev.shown_count >= 1 and mas_pastOneDay(persistent.submods_dathorse_FDAR_date):
-        m 1eub "I'll check, do a cute smile for me~"
-        m 1dsb "Smile towards the camera...{nw}"
-    else:
-        m 1eub "Didn't you already ask me that today, [player]?"
-        m 1eua "That's fine by me, I love seeing you more~"
-        m 1dsb "Look towards the camera...{nw}"
-    if MASM.isWorking():
-        $ success = FDAR.canSeePlayer()
-        if not success:
-            m 1dkd "I'm not seeing anything..."
-            m 2esd "Is your webcam working [player]?"
-        elif success:
-            python:
-                if mas_pastOneDay(persistent.submods_dathorse_FDAR_date): 
-                    persistent.submods_dathorse_FDAR_date = datetime.date.today()
-
-            m 1hsb "I can see you [player]!"
-            $ randComp = randrange(0, 1 + 1)
-            if randComp == 0:
-                if _mas_getAffection() > 100:
-                    m 1hub "You look really cute today~"
-                else:
-                    m 1hub "You look cute today~"
-            elif randComp == 1:
-                if _mas_getAffection() > 100:
-                    m 1hub "You look very lovely!"
-                else:
-                    m 1hub "You look lovely!"
-    else:
-        m 1hksdlb "...{w=0.3}eh?"
-        m 2esd "Sorry [player]. For some reason I cannot access your webcam."
-    return
+            if _tooltip:
+                textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
+                    action Function(FDAR._switchMemoryTimeout)
+                    hovered SetField(_tooltip, "value", "How long will Monika memorize you for before stopping, longer is better.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
+                    action Function(FDAR._switchMemoryTimeout)
+                
+            if _tooltip:
+                textbutton _("Re-Memorize"):
+                    action Function(FDAR._memorizePlayer, True)
+                    hovered SetField(_tooltip, "value", "Force re-memorization if you changed memorization stop time or have issues with Monika seeing you.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Re-Memorize"):
+                    action Function(FDAR._memorizePlayer, True)
