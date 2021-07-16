@@ -94,8 +94,9 @@ init -990 python:
             FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
             FDAR._setDetectionMethod(persistent.submods_dathorse_FDAR_detectionMethod)
             FDAR._setAllowAccess(persistent.submods_dathorse_FDAR_allowAccess)
-            FDAR.stateMachine["PREPARING"] = True
-            FDAR._startScreenUpdate()
+            if persistent.submods_dathorse_FDAR_allowAccess:
+                FDAR.stateMachine["PREPARING"] = True
+                FDAR._startScreenUpdate()
         
         # Closes necessary things at exit
         # This is for internal use.
