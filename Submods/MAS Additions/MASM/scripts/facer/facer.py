@@ -7,10 +7,12 @@ import time
 import numpy as np
 import cv2
 import pathlib
+import pickle
 
 face_recognizer_lbph = None
 face_recognizer_dnn = None
 people = {}
+nameIndex = {}
 onCam = None
 
 realPath = os.path.dirname(os.path.realpath(__file__))
@@ -78,9 +80,11 @@ def camFrame(minLightLevel = 0):
 # If minLightLevel is greater than 0 and it's not hit, LightLevelLow is thrown
 def take_faces(personName, count = 100, timeout = 3, savePicturePath = None, recreate = False, useDNN = False, minLightLevel = 0):
 	global people
+	global nameIndex
 	completed = 0
-	if recreate is True:
+	if recreate:
 		people = {}
+		nameIndex = {}
 
 	facelist = []
 	startTime = time.time()
@@ -114,10 +118,10 @@ def take_faces(personName, count = 100, timeout = 3, savePicturePath = None, rec
 			timeout += time.time() - dt
 			continue
 
-		facelist.append((personName, faces[0]))
+		facelist.append(faces[0]) # Append first found face
 		if savePicturePath:
 			try:
-				cv2.imwrite(os.path.join(savePicturePath, "face_{}.png".format(completed)), faces[0])
+				cv2.imwrite(os.path.join(savePicturePath, f"{personName}/face_{completed}.png"), faces[0])
 			except Exception as e:
 				print(f"Failed to save frame: {e}")
 				return False
@@ -126,7 +130,9 @@ def take_faces(personName, count = 100, timeout = 3, savePicturePath = None, rec
 
 	print("\n")
 	if len(facelist) > 0:
-		people[len(people)] = facelist
+		idx = nameIndex.get(personName, len(people))
+		people[idx] = facelist
+		nameIndex[personName] = idx
 	else:
 		print("List empty after take")
 		return False
@@ -222,6 +228,7 @@ def detect_faces_dnn(img, sceneGray = True):
 # ex. images/MyName, and you give it "images" directory as the data_folder
 def train_faces_lbph(data_folder = None, recreate = False):
 	global people
+	global nameIndex
 	global face_recognizer_lbph
 	requireOneTime = False
 	if face_recognizer_lbph is None or recreate is True:
@@ -244,12 +251,14 @@ def train_faces_lbph(data_folder = None, recreate = False):
 				image_path = os.path.join(fileDir, file)
 				image = cv2.imread(image_path)
 
-				print("Progress: {}/{} images".format(i + 1, pSize), end="\r")
+				print(f"Progress: {i+1}/{pSize} images", end="\r")
 				if image is not None:
-					facelist.append((subdir, image))
+					facelist.append(image)
 
 			if len(facelist) > 0:
-				people[len(people)] = facelist
+				idx = nameIndex.get(subdir, len(people))
+				people[idx] = facelist
+				nameIndex[subdir] = idx
 			else:
 				print("Error: facelist empty loading from folder")
 
@@ -263,13 +272,12 @@ def train_faces_lbph(data_folder = None, recreate = False):
 
 	print("Training LBPH.. ", end="")
 	try:
-		for k, v in people.items():
+		for index, data in people.items():
 			labels = []
 			datalist = []
-			for n, d in v:
-				if d is not None:
-					labels.append(k)
-					datalist.append(d)
+			for d in data:
+				labels.append(index)
+				datalist.append(d)
 
 			if len(labels) > 0 and len(datalist) > 0:
 				if requireOneTime is True:
@@ -289,43 +297,44 @@ def train_faces_lbph(data_folder = None, recreate = False):
 
 # Save trained LBPH recognition data
 # requires that you train LBPH first
-def save_trained_lbph(save_dir):
+def save_trained_lbph(lbph_path, names_path):
+	global nameIndex
 	global face_recognizer_lbph
 	print("Saving LBPH.. ", end="")
 	if not face_recognizer_lbph:
 		print("Unable to save. LBPH recognizer not trained yet")
 		return
 	try:
-		face_recognizer_lbph.write(save_dir)
+		face_recognizer_lbph.write(lbph_path)
+		with open(names_path, "wb") as f:
+			pickle.dump(nameIndex, f)
 		print("Success")
 	except Exception as e: 
 		print(f"Unable to save. Reason: {e}")
 	
 # Load trained LBPH recognition data
-# you need to give namelist with correct indices
-def load_trained_lbph(load_dir, namelist):
-	global people
+def load_trained_lbph(lbph_path, names_path):
+	global nameIndex
 	global face_recognizer_lbph
-	for name in namelist:
-		people[len(people)] = [(name, None)]
-
 	print("Loading LBPH.. ", end="")
 	if not face_recognizer_lbph:
 		face_recognizer_lbph = cv2.face.LBPHFaceRecognizer_create()
 	try:
-		face_recognizer_lbph.read(load_dir)
-		print("Success")
+		face_recognizer_lbph.read(lbph_path)
+		with open(names_path, "rb") as f:
+			nameIndex = pickle.load(f)
+		print(f"Success, indexes: {nameIndex}")
 	except Exception as e:
 		print(f"Exception on load: {e}")
 	
 # Attempts to recognize lbph trained faces within input image
 # returns boolean if any face is detected and tuple of recognized faces
-# tuple contains name and rectangle of face for each person (name is None if not recognized)
+# tuple contains index and rectangle of face for each person (name is None if not recognized)
 # argument threshold is the threshold for faces being recognized
 # higher value is lower tolerance, meaning random faces 
 # could be recognized as other people
 def recognize_faces_lbph(image, threshold = 0.8, useDNN = False):
-	global people
+	global nameIndex
 	if image is not None:
 		try:
 			if useDNN:
@@ -348,8 +357,12 @@ def recognize_faces_lbph(image, threshold = 0.8, useDNN = False):
 					else:
 						try:
 							found = True
-							if difference < (threshold * 100) and len(people[label][0]) > 0:
-								name = people[label][0][0]
+							if difference < (threshold * 100):
+								name = None
+								for k, v in nameIndex.items():
+									if v == label:
+										name = k
+										break
 								recognized.append((name, face))
 							else:
 								recognized.append((None, face))

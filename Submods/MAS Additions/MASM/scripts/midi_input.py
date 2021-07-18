@@ -17,12 +17,13 @@ def Update():
 	if inPort is not None:
 		if doReadInput and socketer.hasDataBool("MIDI_STOP"):
 			doReadInput = False
-		elif socketer.hasDataBool("MIDI_START"):
+		elif not doReadInput and socketer.hasDataBool("MIDI_START"):
 			doReadInput = True
 		for msg in inPort.iter_pending():
-			binary = msg.bytes()
-			if doReadInput and len(binary) >= 3:
-				if  binary[0] == 144 and binary[2] > 0:
-					socketer.sendData(f"MIDI_NOTE.{binary[1]}", binary[2])
-				elif binary[0] == 128 or binary[2] == 0:
-					socketer.sendData(f"MIDI_NOTE.{binary[1]}", 0)
+			if doReadInput: # We want to clear old pending messages but not send them if input is disabled
+				binary = msg.bytes()
+				if len(binary) >= 3:
+					if  binary[0] == 144 and binary[2] > 0:
+						socketer.sendData(f"MIDI_NOTE.{binary[1]}", binary[2])
+					elif binary[0] == 128 or binary[2] == 0:
+						socketer.sendData(f"MIDI_NOTE.{binary[1]}", 0)

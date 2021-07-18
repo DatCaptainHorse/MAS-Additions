@@ -12,8 +12,8 @@ default persistent.submods_dathorse_FDAR_date = None
 default persistent.submods_dathorse_FDAR_todayNotified = False # Don't keep notifying on alltime topic about doing it on same day
 default persistent.submods_dathorse_FDAR_allowAccess = False
 default persistent.submods_dathorse_FDAR_detectionMethod = "HAAR" # Default to HAAR for faster recognition
-default persistent.submods_dathorse_FDAR_detectionTimeout = 15 # 15 seconds should be good enough, user can adjust if needed
-default persistent.submods_dathorse_FDAR_memoryTimeout = 5 # 5 seconds of data, might be enough for most?
+default persistent.submods_dathorse_FDAR_detectionTimeout = 10 # 10 seconds should be good enough, user can adjust if needed
+default persistent.submods_dathorse_FDAR_memoryTimeout = 3 # 3 seconds of larger data, starting at 60MB (math goes: 100MB * timeout / 5)
 
 init -990 python:
     store.mas_submod_utils.Submod(
@@ -40,6 +40,7 @@ init -990 python:
     class FDAR:
         status = None
         statusThread = None
+        initPrepared = False
         statusThreadEvent = None
         workaroundAllowState = False
         stateMachine = { "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False }
@@ -62,6 +63,9 @@ init -990 python:
                     FDAR.stateMachine["PREPARING"] = False
                     FDAR.status = "Ready!"
                     renpy.restart_interaction()
+                    if not FDAR.initPrepared:
+                        FDAR.initPrepared = True
+                        FDAR._memorizePlayer(removeOld = False, overrideTimeout = 1)
                 elif FDAR.stateMachine["PREPARING"]:
                     FDAR.status = "Preparing data, please wait{}".format(coolDots)
                     renpy.restart_interaction()
@@ -109,16 +113,13 @@ init -990 python:
         # Request to memorize player
         # This is for internal use.
         @staticmethod
-        def _memorizePlayer(removeOld = False, duringRecognize = False):
+        def _memorizePlayer(removeOld = False, duringRecognize = False, overrideTimeout = 0):
             if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess:
                 FDAR.status = "Memorize requested"
                 if not duringRecognize:
                     FDAR.stateMachine["PREPARING"] = True
                     FDAR._startScreenUpdate()
-                if removeOld:
-                    MASM.sendData("FDAR_MEMORIZE", True)
-                else:
-                    MASM.sendData("FDAR_MEMORIZE", False)
+                MASM.sendData("FDAR_MEMORIZE", (removeOld, overrideTimeout))
 
         # Sets whether webcam access is allowed or not.
         # This is mainly for internal use. However if you wish to have dialogue where Monika changes access herself, it's fine to use this.
@@ -167,8 +168,6 @@ init -990 python:
                     persistent.submods_dathorse_FDAR_detectionTimeout = 15
                 elif persistent.submods_dathorse_FDAR_detectionTimeout == 15:
                     persistent.submods_dathorse_FDAR_detectionTimeout = 20
-                elif persistent.submods_dathorse_FDAR_detectionTimeout == 20:
-                    persistent.submods_dathorse_FDAR_detectionTimeout = 25
                 else:
                     persistent.submods_dathorse_FDAR_detectionTimeout = 5
                 FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
@@ -185,16 +184,22 @@ init -990 python:
         @staticmethod
         def _switchMemoryTimeout():
             if not FDAR.stateMachine["PREPARING"]:
-                if persistent.submods_dathorse_FDAR_memoryTimeout == 5:
-                    persistent.submods_dathorse_FDAR_memoryTimeout = 10
-                elif persistent.submods_dathorse_FDAR_memoryTimeout == 10:
-                    persistent.submods_dathorse_FDAR_memoryTimeout = 15
-                elif persistent.submods_dathorse_FDAR_memoryTimeout == 15:
-                    persistent.submods_dathorse_FDAR_memoryTimeout = 20
-                elif persistent.submods_dathorse_FDAR_memoryTimeout == 20:
-                    persistent.submods_dathorse_FDAR_memoryTimeout = 25
-                else:
+                if persistent.submods_dathorse_FDAR_memoryTimeout == 3:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 4
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 4:
                     persistent.submods_dathorse_FDAR_memoryTimeout = 5
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 5:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 6
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 6:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 7
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 7:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 8
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 8:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 9
+                elif persistent.submods_dathorse_FDAR_memoryTimeout == 9:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 10
+                else:
+                    persistent.submods_dathorse_FDAR_memoryTimeout = 3
                 FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
 
         # Sets detection method, for internal use
@@ -231,11 +236,11 @@ init -990 python:
 
         # Parameter person, name of person to look for, default is "Player"
         # Returns 1 if person's face was recognized or 0 if an error occurred, webcam access is disabled or MASM isn't running. 
-        # Can also return -1 if low-light is an issue, -2 if waiting needs to be done.
+        # Can also return -1 if low-light is an issue, -2 if waiting needs to be done or -3 if timeout was hit (only returned once).
         lightTime = None
         timeoutTime = None
-        sayLightOnce = False
         extraTimeOnce = False
+        timedOutOnce = False
         @staticmethod
         def canSee(person = "Player"):
             if not MASM.isWorking():
@@ -246,7 +251,7 @@ init -990 python:
                     FDAR.stateMachine["RECOGNIZING"] = True
                     FDAR.timeoutTime = time.time()
                     FDAR.extraTimeOnce = False
-                    FDAR.sayLightOnce = False
+                    FDAR.timedOutOnce = False
                     FDAR.lightTime = None
 
                 while time.time() - FDAR.timeoutTime < persistent.submods_dathorse_FDAR_detectionTimeout and MASM.isWorking():
@@ -254,17 +259,13 @@ init -990 python:
                         if MASM.hasDataBool("FDAR_PREPARING_DONE"):
                             FDAR.stateMachine["MEMORIZING"] = False
                             return -2
-                        elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT"):
+                        elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT") and FDAR.lightTime is None:
                             FDAR._memorizePlayer(duringRecognize = True) # Keep trying
-                            if not FDAR.sayLightOnce:
-                                FDAR.sayLightOnce = True
-                                FDAR.lightTime = time.time()
-                                return -1
-                        elif FDAR.lightTime is not None and time.time() - FDAR.lightTime > 5: # Workaround to return back to "this might take a while" if lights are good now
+                            FDAR.lightTime = time.time()
+                            return -1
+                        elif FDAR.lightTime is not None and time.time() - FDAR.lightTime > 3: # Return back to "this might take a while" if lights are good now
                             FDAR.lightTime = None
-                            if FDAR.sayLightOnce:
-                                FDAR.sayLightOnce = False
-                                return -2
+                            return -2
                     elif FDAR.stateMachine["RECOGNIZING"]:
                         if MASM.hasDataBool("FDAR_NOTMEMORIZED"):
                             FDAR.stateMachine["MEMORIZING"] = True
@@ -274,26 +275,39 @@ init -990 python:
                                 FDAR.extraTimeOnce = True
                                 FDAR.timeoutTime += persistent.submods_dathorse_FDAR_memoryTimeout # Some extra time
                                 return -2
-                        elif MASM.hasDataBool("FDAR_LOWLIGHT"):
+                        elif MASM.hasDataBool("FDAR_LOWLIGHT") and FDAR.lightTime is None:
+                            FDAR.lightTime = time.time()
                             return -1
+                        elif FDAR.lightTime is not None and time.time() - FDAR.lightTime > 3: # Low-light resolved probably..
+                            FDAR.lightTime = None
+                            return -2
                         elif MASM.hasDataBool("FDAR_FAILURE"):
+                            MASM.hasDataBool("FDAR_FAILURE") # Clear out possible old result just in case
                             FDAR.stateMachine["RECOGNIZING"] = False
                             FDAR.stateMachine["MEMORIZING"] = False
+                            FDAR.timedOutOnce = False
                             return 0
                         elif MASM.hasDataValue("FDAR_RECOGNIZED") == person:
+                            MASM.hasDataBool("FDAR_RECOGNIZED") # And here..
                             FDAR.stateMachine["RECOGNIZING"] = False
                             FDAR.stateMachine["MEMORIZING"] = False
+                            FDAR.timedOutOnce = False
                             return 1
 
                     time.sleep(0.1) # Just to ease up on the loop
 
                 FDAR.stateMachine["RECOGNIZING"] = False
                 FDAR.stateMachine["MEMORIZING"] = False
-                MASM.sendData("FDAR_RECOGNIZESTOP")
-                FDAR.extraTimeOnce = False
-                FDAR.sayLightOnce = False
-                FDAR.lightTime = None
-                return 0 # Return failure if timeout happened
+                if not FDAR.timedOutOnce and MASM.isWorking():
+                    FDAR.timedOutOnce = True
+                    FDAR.timeoutTime = time.time() # Reset timer
+                    return -3 # Return timeout only once
+                else:
+                    MASM.sendData("FDAR_RECOGNIZESTOP")
+                    FDAR.extraTimeOnce = False
+                    FDAR.timedOutOnce = False
+                    FDAR.lightTime = None
+                    return 0 # Otherwise fail
             else:
                 return -2
 
@@ -339,7 +353,7 @@ screen FDAR_settings_pane():
             if _tooltip:
                 textbutton _("Recognize timeout: {}s".format(persistent.submods_dathorse_FDAR_detectionTimeout)):
                     action Function(FDAR._switchTimeout)
-                    hovered SetField(_tooltip, "value", "How long will Monika try to see you before giving up, best to keep default unless Monika has trouble seeing you.")
+                    hovered SetField(_tooltip, "value", "How long will Monika try to see you for before giving up.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Recognize timeout: {}s".format(persistent.submods_dathorse_FDAR_detectionTimeout)):
@@ -348,16 +362,26 @@ screen FDAR_settings_pane():
             if _tooltip:
                 textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
                     action Function(FDAR._switchMemoryTimeout)
-                    hovered SetField(_tooltip, "value", "How long will Monika memorize you for before stopping, longer is better.")
+                    hovered SetField(_tooltip, "value", "How long will Monika memorize you for initially, longer is better but\n uses more space (limited to 60MB at 3s - 200MB at 10s)")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
                     action Function(FDAR._switchMemoryTimeout)
+
+        hbox:
+            if _tooltip:
+                textbutton _("Update Memory"):
+                    action Function(FDAR._memorizePlayer, False, False, 2)
+                    hovered SetField(_tooltip, "value", "Adds your current look to Monika's memory so she can see you easier.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Update Memory"):
+                    action Function(FDAR._memorizePlayer, False, False, 2)
                 
             if _tooltip:
                 textbutton _("Re-Memorize"):
                     action Function(FDAR._memorizePlayer, True)
-                    hovered SetField(_tooltip, "value", "Force re-memorization if you changed memorization stop time or have issues with Monika seeing you.")
+                    hovered SetField(_tooltip, "value", "Complete re-memorization if you have issues with Monika seeing you no matter what.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Re-Memorize"):

@@ -76,7 +76,7 @@ init 811 python:
                                 self.midiCBKeys[k] = vel
                                 renpy.redraw(self, 0)
                 else:
-                    time.sleep(0.01) # Smollest nap
+                    time.sleep(0) # Yield thread, can't sleep as it adds too much latency and timing is not stable
                             
         def render(self, ev, x, y, st):
             for k, vel in self.midiCBKeys.viewitems():
@@ -133,12 +133,12 @@ label submods_dathorse_MIDI_override_piano_songchoice:
         menu:
             m "Did you want to play a song or play on your own, [player]?{fast}"
             "Play a song.":
-                m "Which song?"
+                m "Which song would you like to play?" nointeract
                 show monika at t21
                 call screen mas_gen_scrollable_menu(song_list, mas_piano_keys.MENU_AREA, mas_piano_keys.MENU_XALIGN, final_item)
                 show monika at t11
                 $ pnml = _return
-                if pnml != "None":
+                if pnml:
                     m 1hua "I'm so excited to hear you play, [player]!"
                     #if pnml.launch_label:
                         #call expression pnml.launch_label from _zzpk_ssll
@@ -159,15 +159,17 @@ label submods_dathorse_MIDI_override_piano_setupstart:
         disable_esc()
         mas_MUMURaiseShield()
     stop music
-    $ ui.add(PianoDisplayableOverride(play_mode, pnml=pnml))
+    $ piano_displayable_obj = PianoDisplayableOverride(play_mode, pnml=pnml)
+    $ ui.add(piano_displayable_obj)
     $ full_combo,is_win,is_practice,post_piano = ui.interact()
+    $ del piano_displayable_obj
     $ mas_MUMUDropShield()
     $ enable_esc()
     $ mas_startup_song()
     $ pnmlSaveTuples()
     show monika 1hua at t11
     if full_combo and not persistent._mas_ever_won['piano']:
-        $persistent._mas_ever_won['piano']=True
+        $ persistent._mas_ever_won['piano'] = True
 
     #call expression post_piano from _zzpk_ppel
     if post_piano != "mas_piano_result_none":

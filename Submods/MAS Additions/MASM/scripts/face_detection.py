@@ -9,10 +9,11 @@ import threading
 masmPath = None
 pDataPath = None
 pLBPHPath = None
+pNamePath = None
 
 useDNN = False
-failTimeout = 15
-memoryTimeout = 15
+failTimeout = 10
+memoryTimeout = 3
 lastAccess = False
 preparedYet = False
 
@@ -21,30 +22,44 @@ detcRun = threading.Event()
 detcLock = threading.Lock()
 
 # Prepares face-data
-def facePrepare(retake = False):
+def facePrepare(retake = False, overrideTimeout = 0):
 	global useDNN
 	global masmPath
 	global pDataPath
 	global pLBPHPath
+	global pNamePath
 	global preparedYet
 	global memoryTimeout
 	# If recreation is desired, remove old data
 	if retake is True:
 		pLBPHPath.unlink(missing_ok = True)
+		pNamePath.unlink(missing_ok = True)
 	# face-data path does not exist, create it
 	if not pDataPath.exists():
 		pDataPath.mkdir(parents = True, exist_ok = True)
 	# existing facial data exists, load the data
-	if pLBPHPath.exists():
+	if pLBPHPath.exists() and pNamePath.exists() and not preparedYet:
 		print("Loading face-data")
-		facer.load_trained_lbph(str(pLBPHPath), ["Player"])
+		facer.load_trained_lbph(str(pLBPHPath), str(pNamePath))
 		facer.camFrame() # Empty frame-grab to turn on webcam light, some webcams be like that
 		preparedYet = True
 		socketer.sendData("FDAR_PREPARING_DONE")
-	else: # no existing data
-		print("No face-data found, taking..")
+	else: # no existing data or update
+		if not retake and pLBPHPath.exists() and pNamePath.exists():
+			print("Updating with new data..")
+			if pLBPHPath.stat().st_size > 100000000 * (memoryTimeout / 5): # Limit max memory size
+				print("Memory size limit reached, re-memorizing instead..")
+				pLBPHPath.unlink(missing_ok = True)
+				pNamePath.unlink(missing_ok = True)
+				overrideTimeout = 0 # We want larger chunk of initial data, reset override
+				retake = True
+		else:
+			print("No face-data found, taking..")
 		try:
-			if not facer.take_faces("Player", count = 0, timeout = memoryTimeout, recreate = retake, minLightLevel = 15):
+			chosenTimeout = memoryTimeout
+			if overrideTimeout > 0:
+				chosenTimeout = overrideTimeout
+			if not facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, minLightLevel = 15):
 				return False
 		except facer.LightLevelLow:
 			raise
@@ -61,7 +76,7 @@ def facePrepare(retake = False):
 			socketer.sendData("FDAR_FAILURE")
 
 		try:
-			facer.save_trained_lbph(str(pLBPHPath))
+			facer.save_trained_lbph(str(pLBPHPath), str(pNamePath))
 		except Exception as e:
 			SE.Log(f"Exception on save: {e}")
 			socketer.sendData("FDAR_FAILURE")
@@ -121,6 +136,7 @@ def recognizeKnown():
 					return knownFound
 				else:
 					SE.Log("Found nobody")
+					return None
 	socketer.sendData("FDAR_FAILURE")
 	return None
 	
@@ -150,8 +166,10 @@ def _recognizeLoop():
 		toMemorize = socketer.hasDataValue("FDAR_MEMORIZE")
 		if toMemorize is not None and lastAccess:
 			try:
-				preparedYet = False
-				if not facePrepare(retake = toMemorize):
+				(removeOld, override) = toMemorize
+				if removeOld:
+					preparedYet = False
+				if not facePrepare(retake = removeOld, overrideTimeout = override):
 					SE.Log("Failed to memorize")
 					socketer.sendData("FDAR_FAILURE")
 			except facer.LightLevelLow:
@@ -172,20 +190,16 @@ def _recognizeLoop():
 
 		if shouldRecognize:
 			startTime = time.time()
-			tellOnceLight = False
 			while time.time() - startTime < failTimeout:
 				if socketer.hasDataBool("FDAR_RECOGNIZESTOP"):
 					shouldRecognize = False
 					break
 				elif time.time() - lastTime > 1.0: # Ease up on loop, attempt every second
-					res = None
 					try:
 						res = recognizeKnown()
 					except facer.LightLevelLow:
-						if not tellOnceLight:
-							tellOnceLight = True
-							SE.Log("Low-light on recognize")
-							socketer.sendData("FDAR_LOWLIGHT") # No breaking here so we can fail eventually as we want to keep trying
+						SE.Log("Low-light on recognize")
+						socketer.sendData("FDAR_LOWLIGHT") # No breaking here so we can fail eventually as we want to keep trying
 					except DataNotPrepared:
 						shouldRecognize = False
 						break # We don't want to deal with this here.. Trust me I tried
@@ -268,11 +282,13 @@ def Start():
 	global masmPath
 	global pDataPath
 	global pLBPHPath
+	global pNamePath
 	global detcThread
 	# Setup some paths
 	masmPath = os.path.dirname(os.path.realpath(__file__)) # Get our full path
 	pDataPath = pathlib.Path(masmPath)/"face-data" # Data folder
 	pLBPHPath = pDataPath/"data-lbph.xml" # Data file
+	pNamePath = pDataPath/"data-names.pkl" # Names file
 	# Create thread
 	detcThread = threading.Thread(target = _recognizeLoop)
 
