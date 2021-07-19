@@ -66,6 +66,9 @@ init -990 python:
                     if not FDAR.initPrepared:
                         FDAR.initPrepared = True
                         FDAR._memorizePlayer(removeOld = False, overrideTimeout = 1)
+                elif MASM.hasDataBool("FDAR_NOPREPAREDATA"):
+                    if not FDAR.initPrepared: # Don't update data immediately if we are already taking initial one
+                        FDAR.initPrepared = True
                 elif FDAR.stateMachine["PREPARING"]:
                     FDAR.status = "Preparing data, please wait{}".format(coolDots)
                     renpy.restart_interaction()
@@ -371,12 +374,12 @@ screen FDAR_settings_pane():
         hbox:
             if _tooltip:
                 textbutton _("Update Memory"):
-                    action Function(FDAR._memorizePlayer, False, False, 2)
+                    action Function(FDAR._memorizePlayer, False, False, 1)
                     hovered SetField(_tooltip, "value", "Adds your current look to Monika's memory so she can see you easier.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Update Memory"):
-                    action Function(FDAR._memorizePlayer, False, False, 2)
+                    action Function(FDAR._memorizePlayer, False, False, 1)
                 
             if _tooltip:
                 textbutton _("Re-Memorize"):

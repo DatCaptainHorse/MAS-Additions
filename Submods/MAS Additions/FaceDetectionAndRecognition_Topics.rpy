@@ -126,9 +126,10 @@ label submods_dathorse_facedetection_anytime_main:
             jump submods_dathorse_facedetection_anytime_main
         elif result == 1:
             if mas_pastOneDay(persistent.submods_dathorse_FDAR_date): # Once per day, add some minor fresh data
-                m 1hsb "I can see you [player]! Give me just a moment...{nw}"
+                m 1hsa "...{nw}"
                 $ FDAR._memorizePlayer(removeOld = False, duringRecognize = True, overrideTimeout = 2) # Same here
-                $ time.sleep(1) # Just some sleep so player can see message
+                $ time.sleep(5) # Some sleep so player can see message and memorization can finish
+                m 1hsb "Ah! Sorry [player], I got lost looking into your eyes."
             else:
                 m 1hsb "I can see you [player]!"
             python:

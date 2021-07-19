@@ -75,9 +75,9 @@ init -991 python:
                 if MASM.path: # Open MASM subprocess
                     try:
                         sInfo = None
-                        #if renpy.windows: # Hide external cmd popup in Windows
-                            #sInfo = subprocess.STARTUPINFO()
-                            #sInfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        if renpy.windows: # Hide external cmd popup in Windows
+                            sInfo = subprocess.STARTUPINFO()
+                            sInfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                         MASM.subProc = subprocess.Popen(MASM.path, startupinfo=sInfo)
                         MASM.status = "Subprocess was created"
                     except:

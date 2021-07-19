@@ -1,10 +1,10 @@
 import os
 import time
-import facer
 import shutil
 import pathlib
 import socketer
 import threading
+from facer import Facer
 
 masmPath = None
 pDataPath = None
@@ -40,8 +40,7 @@ def facePrepare(retake = False, overrideTimeout = 0):
 	# existing facial data exists, load the data
 	if pLBPHPath.exists() and pNamePath.exists() and not preparedYet:
 		print("Loading face-data")
-		facer.load_trained_lbph(str(pLBPHPath), str(pNamePath))
-		facer.camFrame() # Empty frame-grab to turn on webcam light, some webcams be like that
+		Facer.load_trained_lbph(str(pLBPHPath), str(pNamePath))
 		preparedYet = True
 		socketer.sendData("FDAR_PREPARING_DONE")
 	else: # no existing data or update
@@ -55,20 +54,21 @@ def facePrepare(retake = False, overrideTimeout = 0):
 				retake = True
 		else:
 			print("No face-data found, taking..")
+			socketer.sendData("FDAR_NOPREPAREDATA")
 		try:
 			chosenTimeout = memoryTimeout
 			if overrideTimeout > 0:
 				chosenTimeout = overrideTimeout
-			if not facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, minLightLevel = 15):
+			if not Facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, minLightLevel = 15):
 				return False
-		except facer.LightLevelLow:
+		except Facer.LightLevelLow:
 			raise
 		except Exception as e:
 			SE.Log(f"Exception on taking data: {e}")
 			return False
 
 		try:
-			if not facer.train_faces_lbph(recreate = retake):
+			if not Facer.train_faces_lbph(recreate = retake):
 				socketer.sendData("FDAR_FAILURE")
 				return False
 		except Exception as e:
@@ -76,7 +76,7 @@ def facePrepare(retake = False, overrideTimeout = 0):
 			socketer.sendData("FDAR_FAILURE")
 
 		try:
-			facer.save_trained_lbph(str(pLBPHPath), str(pNamePath))
+			Facer.save_trained_lbph(str(pLBPHPath), str(pNamePath))
 		except Exception as e:
 			SE.Log(f"Exception on save: {e}")
 			socketer.sendData("FDAR_FAILURE")
@@ -103,8 +103,9 @@ def recognizeKnown():
 		raise DataNotPrepared
 	else:
 		try:
-			frame = facer.camFrame(minLightLevel = 15)
-		except facer.LightLevelLow:
+			Facer.camClearBuffer()
+			frame = Facer.camFrame(minLightLevel = 15)
+		except Facer.LightLevelLow:
 			raise
 		except Exception as e:
 			SE.Log(f"Capture frame exception: {e}")
@@ -113,7 +114,7 @@ def recognizeKnown():
 		else:
 			try:
 				with detcLock:
-					found, people = facer.recognize_faces_lbph(frame, threshold, useDNN)
+					found, people = Facer.recognize_faces_lbph(frame, threshold, useDNN)
 			except Exception as e:
 				SE.Log(f"LBPH recognizing exception: {e}")
 				#socketer.sendData("FDAR_FAILURE") # Disabled cuz hitting Python's nerve or something causing exception with random number, randomly. Works despite that
@@ -153,7 +154,7 @@ def _recognizeLoop():
 			if not facePrepare():
 				SE.Log("Failed to prepare data")
 				socketer.sendData("FDAR_FAILURE")
-		except facer.LightLevelLow:
+		except Facer.LightLevelLow:
 			SE.Log("Low-light on prepare")
 			socketer.sendData("FDAR_MEMORIZE_LOWLIGHT")
 		except Exception as e:
@@ -172,7 +173,7 @@ def _recognizeLoop():
 				if not facePrepare(retake = removeOld, overrideTimeout = override):
 					SE.Log("Failed to memorize")
 					socketer.sendData("FDAR_FAILURE")
-			except facer.LightLevelLow:
+			except Facer.LightLevelLow:
 				SE.Log("Low-light on memorize")
 				socketer.sendData("FDAR_MEMORIZE_LOWLIGHT")
 			except Exception as e:
@@ -197,7 +198,7 @@ def _recognizeLoop():
 				elif time.time() - lastTime > 1.0: # Ease up on loop, attempt every second
 					try:
 						res = recognizeKnown()
-					except facer.LightLevelLow:
+					except Facer.LightLevelLow:
 						SE.Log("Low-light on recognize")
 						socketer.sendData("FDAR_LOWLIGHT") # No breaking here so we can fail eventually as we want to keep trying
 					except DataNotPrepared:
@@ -255,7 +256,8 @@ def Update():
 	if allowAccess is True and allowAccess != lastAccess:
 		try:
 			SE.Log("Recognition allowed")
-			facer.camOn()
+			Facer.camOn()
+			Facer.camFrame() # Turn on light with empty read
 			detcRun.clear()
 			if detcThread is None:
 				detcThread = threading.Thread(target = _recognizeLoop)
@@ -263,7 +265,7 @@ def Update():
 			lastAccess = allowAccess
 		except Exception as e:
 			SE.Log(f"Exception to start recognition thread: {e}")
-			facer.camOff() # Just in case
+			Facer.camOff() # Just in case
 	elif allowAccess is False and allowAccess != lastAccess:
 		try:
 			SE.Log("Recognition not allowed")
@@ -271,12 +273,12 @@ def Update():
 			if detcThread is not None:
 				detcThread.join()
 				detcThread = None
-			facer.camOff()
+			Facer.camOff()
 			lastAccess = allowAccess
 			preparedYet = False # So we can re-check for data existence
 		except Exception as e:
 			SE.Log(f"Exception to stop recognition thread: {e}")
-			facer.camOff() # Just in case as well
+			Facer.camOff() # Just in case as well
 
 def Start():
 	global masmPath
@@ -297,4 +299,4 @@ def OnQuit():
 	global detcThread
 	detcRun.set()
 	detcThread.join()
-	facer.camOff()
+	Facer.camOff()
