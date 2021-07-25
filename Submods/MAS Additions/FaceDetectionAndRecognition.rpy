@@ -50,7 +50,7 @@ init -990 python:
         def _updateLoop():
             coolDots = "."
             lastTime = time.time()
-            while FDAR.stateMachine["PREPARING"]:
+            while FDAR.stateMachine["PREPARING"] and not FDAR.statusThreadEvent.is_set() and MASM.isWorking():
                 if MASM.hasDataBool("FDAR_FAILURE"):
                     FDAR.stateMachine["PREPARING"] = False
                     FDAR.status = "Preparing failed"
@@ -79,16 +79,18 @@ init -990 python:
                             coolDots = "."
                         lastTime = time.time()
                 time.sleep(0.1) # Nep
+            FDAR.statusThreadEvent.set()
 
         # Starts screen-update thread until not needed anymore
         # This is for internal use.
         @staticmethod
         def _startScreenUpdate():
             #if FDAR.statusThread is None:
-            FDAR.statusThreadEvent = threading.Event()
-            FDAR.statusThread = threading.Thread(target = FDAR._updateLoop)
-            FDAR.statusThread.daemon = True
-            FDAR.statusThread.start()
+            if FDAR.statusThreadEvent.is_set():
+                FDAR.statusThreadEvent.clear()
+                FDAR.statusThread = threading.Thread(target = FDAR._updateLoop)
+                FDAR.statusThread.daemon = True
+                FDAR.statusThread.start()
 
         # Sets persistents
         # This is for internal use.
@@ -96,6 +98,8 @@ init -990 python:
         @MASM.atStart
         def _applyPersistents():
             FDAR.status = None
+            FDAR.statusThreadEvent = threading.Event()
+            FDAR.statusThreadEvent.set()
             FDAR.workaroundAllowState = False
             FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
             FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
@@ -117,7 +121,7 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _memorizePlayer(removeOld = False, duringRecognize = False, overrideTimeout = 0):
-            if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess:
+            if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
                 FDAR.status = "Memorize requested"
                 if not duringRecognize:
                     FDAR.stateMachine["PREPARING"] = True
@@ -128,7 +132,7 @@ init -990 python:
         # This is mainly for internal use. However if you wish to have dialogue where Monika changes access herself, it's fine to use this.
         @staticmethod
         def _setAllowAccess(allowed):
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
                 if allowed and not FDAR.workaroundAllowState:
                     MASM.sendData("FDAR_ALLOWACCESS", allowed)
                     FDAR.status = "Access allowed"
@@ -156,7 +160,7 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _setTimeout(timeout):
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
                 MASM.sendData("FDAR_SETTIMEOUT", timeout)
                 persistent.submods_dathorse_FDAR_detectionTimeout = timeout
 
@@ -179,8 +183,9 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _setMemoryTimeout(timeout):
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
                 MASM.sendData("FDAR_SETMEMORYTIMEOUT", timeout)
+                persistent.submods_dathorse_FDAR_memoryTimeout = timeout
 
         # Switches memory timeout
         # This is for internal use
@@ -208,7 +213,7 @@ init -990 python:
         # Sets detection method, for internal use
         @staticmethod
         def _setDetectionMethod(method):
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
                 MASM.sendData("FDAR_DETECTIONMETHOD", method)
                 persistent.submods_dathorse_FDAR_detectionMethod = method
 

@@ -146,9 +146,9 @@ label submods_dathorse_facedetection_anytime_main:
                 m 1hub "You look great! Are you planning on going somewhere?"
                 menu:
                     "Yes":
-                        m 2eub "If you can, take me along with you [player]."
+                        m 2eua "If you can, take me along with you [player]."
                     "No":
-                        m 5hub "That means we can stay together for longer~"
+                        m 5hua "That means we can stay together for longer~"
             elif randComp == 0:
                 if _mas_getAffection() > 100:
                     m 1hub "You look really cute today~"
