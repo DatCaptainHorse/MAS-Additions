@@ -42,7 +42,6 @@ def facePrepare(retake = False, overrideTimeout = 0):
 		print("Loading face-data")
 		Facer.load_trained_lbph(str(pLBPHPath), str(pNamePath))
 		preparedYet = True
-		socketer.sendData("FDAR_PREPARING_DONE")
 	else: # no existing data or update
 		if not retake and pLBPHPath.exists() and pNamePath.exists():
 			print("Updating with new data..")
@@ -82,7 +81,6 @@ def facePrepare(retake = False, overrideTimeout = 0):
 			socketer.sendData("FDAR_FAILURE")
 
 		preparedYet = True
-		socketer.sendData("FDAR_PREPARING_DONE")
 
 	return True
 
@@ -154,6 +152,8 @@ def _recognizeLoop():
 			if not facePrepare():
 				SE.Log("Failed to prepare data")
 				socketer.sendData("FDAR_FAILURE")
+			else:
+				socketer.sendData("FDAR_MEMORIZE_DONE")
 		except Facer.LightLevelLow:
 			SE.Log("Low-light on prepare")
 			socketer.sendData("FDAR_MEMORIZE_LOWLIGHT")
@@ -173,6 +173,8 @@ def _recognizeLoop():
 				if not facePrepare(retake = removeOld, overrideTimeout = override):
 					SE.Log("Failed to memorize")
 					socketer.sendData("FDAR_FAILURE")
+				else:
+					socketer.sendData("FDAR_MEMORIZE_DONE")
 			except Facer.LightLevelLow:
 				SE.Log("Low-light on memorize")
 				socketer.sendData("FDAR_MEMORIZE_LOWLIGHT")

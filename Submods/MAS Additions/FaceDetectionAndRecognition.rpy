@@ -39,10 +39,10 @@ init -990 python:
     # Face Detection and Recognition functions
     class FDAR:
         status = None
-        statusThread = None
         initPrepared = False
-        statusThreadEvent = None
         workaroundAllowState = False
+        statusThread = None
+        statusThreadEvent = threading.Event()
         stateMachine = { "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False }
         # Screen update function
         # This is for internal use.
@@ -50,7 +50,7 @@ init -990 python:
         def _updateLoop():
             coolDots = "."
             lastTime = time.time()
-            while FDAR.stateMachine["PREPARING"] and not FDAR.statusThreadEvent.is_set() and MASM.isWorking():
+            while not FDAR.statusThreadEvent.is_set() and MASM.isWorking() and FDAR.stateMachine["PREPARING"]:
                 if MASM.hasDataBool("FDAR_FAILURE"):
                     FDAR.stateMachine["PREPARING"] = False
                     FDAR.status = "Preparing failed"
@@ -59,37 +59,39 @@ init -990 python:
                     FDAR.stateMachine["PREPARING"] = False
                     FDAR.status = "Not enough light"
                     renpy.restart_interaction()
-                elif MASM.hasDataBool("FDAR_PREPARING_DONE"):
+                elif MASM.hasDataBool("FDAR_MEMORIZE_DONE"):
                     FDAR.stateMachine["PREPARING"] = False
-                    FDAR.status = "Ready!"
-                    renpy.restart_interaction()
                     if not FDAR.initPrepared:
                         FDAR.initPrepared = True
                         FDAR._memorizePlayer(removeOld = False, overrideTimeout = 1)
+                    else:
+                        FDAR.status = "Ready!"
+                        renpy.restart_interaction()
                 elif MASM.hasDataBool("FDAR_NOPREPAREDATA"):
                     if not FDAR.initPrepared: # Don't update data immediately if we are already taking initial one
                         FDAR.initPrepared = True
-                elif FDAR.stateMachine["PREPARING"]:
-                    FDAR.status = "Preparing data, please wait{}".format(coolDots)
+                elif time.time() - lastTime > 1.0:
+                    FDAR.status = "Preparing, please wait{}".format(coolDots)
                     renpy.restart_interaction()
-                    if time.time() - lastTime > 1.0: # Dotteroni
-                        if len(coolDots) < 3:
-                            coolDots += "."
-                        else:
-                            coolDots = "."
-                        lastTime = time.time()
+                    if len(coolDots) < 3:
+                        coolDots += "."
+                    else:
+                        coolDots = "."
+                    lastTime = time.time()
                 time.sleep(0.1) # Nep
-            FDAR.statusThreadEvent.set()
+            FDAR.statusThreadEvent.set() # Just-in-case set so we can reset
 
-        # Starts screen-update thread until not needed anymore
+        # Starts screen-update thread
         # This is for internal use.
         @staticmethod
         def _startScreenUpdate():
-            #if FDAR.statusThread is None:
-            if FDAR.statusThreadEvent.is_set():
+            if FDAR.statusThread is None or FDAR.statusThreadEvent.is_set():
+                if FDAR.statusThread is not None and FDAR.statusThread.is_alive():
+                    FDAR.statusThreadEvent.set()
+                    FDAR.statusThread.join()
                 FDAR.statusThreadEvent.clear()
                 FDAR.statusThread = threading.Thread(target = FDAR._updateLoop)
-                FDAR.statusThread.daemon = True
+                #FDAR.statusThread.daemon = True # Just in case
                 FDAR.statusThread.start()
 
         # Sets persistents
@@ -98,8 +100,6 @@ init -990 python:
         @MASM.atStart
         def _applyPersistents():
             FDAR.status = None
-            FDAR.statusThreadEvent = threading.Event()
-            FDAR.statusThreadEvent.set()
             FDAR.workaroundAllowState = False
             FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
             FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
@@ -111,11 +111,11 @@ init -990 python:
         
         # Closes necessary things at exit
         # This is for internal use.
-        #@staticmethod
-        #@atexit.register
-        #def _atExit():
-        #    FDAR.statusThreadEvent.set()
-        #    FDAR.statusThread.join()
+        @staticmethod
+        @atexit.register
+        def _atExit():
+            FDAR.statusThreadEvent.set()
+            FDAR.statusThread.join()
 
         # Request to memorize player
         # This is for internal use.
@@ -138,7 +138,6 @@ init -990 python:
                     FDAR.status = "Access allowed"
                     FDAR.workaroundAllowState = True
                     FDAR.stateMachine["PREPARING"] = True
-                    FDAR._startScreenUpdate()
                 elif not allowed:
                     MASM.sendData("FDAR_ALLOWACCESS", allowed)
                     FDAR.status = "Access not allowed"
@@ -264,7 +263,7 @@ init -990 python:
 
                 while time.time() - FDAR.timeoutTime < persistent.submods_dathorse_FDAR_detectionTimeout and MASM.isWorking():
                     if FDAR.stateMachine["MEMORIZING"]:
-                        if MASM.hasDataBool("FDAR_PREPARING_DONE"):
+                        if MASM.hasDataBool("FDAR_MEMORIZE_DONE"):
                             FDAR.stateMachine["MEMORIZING"] = False
                             return -2
                         elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT") and FDAR.lightTime is None:
