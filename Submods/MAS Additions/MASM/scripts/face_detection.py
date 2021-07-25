@@ -256,16 +256,19 @@ def Update():
 	if allowAccess is True and allowAccess != lastAccess:
 		try:
 			SE.Log("Recognition allowed")
-			Facer.camOn()
-			Facer.camFrame() # Turn on light with empty read
-			detcRun.clear()
-			if detcThread is None:
-				detcThread = threading.Thread(target = _recognizeLoop)
-			detcThread.start()
-			lastAccess = allowAccess
+			if not Facer.camOn():
+				SE.Log("Camera failed to open")
+			else:
+				Facer.camFrame() # Turn on light with empty read
+				detcRun.clear()
+				if detcThread is None:
+					detcThread = threading.Thread(target = _recognizeLoop)
+				detcThread.start()
+				lastAccess = allowAccess
 		except Exception as e:
 			SE.Log(f"Exception to start recognition thread: {e}")
-			Facer.camOff() # Just in case
+			if not Facer.camOff(): # Just in case
+				SE.Log("Camera failed to close?")
 	elif allowAccess is False and allowAccess != lastAccess:
 		try:
 			SE.Log("Recognition not allowed")
@@ -273,12 +276,14 @@ def Update():
 			if detcThread is not None:
 				detcThread.join()
 				detcThread = None
-			Facer.camOff()
+			if not Facer.camOff():
+				SE.Log("Camera failed to close?")
 			lastAccess = allowAccess
 			preparedYet = False # So we can re-check for data existence
 		except Exception as e:
 			SE.Log(f"Exception to stop recognition thread: {e}")
-			Facer.camOff() # Just in case as well
+			if not Facer.camOff(): # Just in case as well
+				SE.Log("Camera failed to close?")
 
 def Start():
 	global masmPath
