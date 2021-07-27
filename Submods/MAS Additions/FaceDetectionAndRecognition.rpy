@@ -250,9 +250,7 @@ init -990 python:
         timedOutOnce = False
         @staticmethod
         def canSee(person = "Player"):
-            if not MASM.isWorking():
-                return 0
-            elif FDAR.canRecognize():
+            if FDAR.canRecognize():
                 if not FDAR.stateMachine["RECOGNIZING"] and not FDAR.stateMachine["MEMORIZING"]:
                     MASM.sendData("FDAR_RECOGNIZEONCE", person)
                     FDAR.stateMachine["RECOGNIZING"] = True
@@ -316,7 +314,7 @@ init -990 python:
                     FDAR.lightTime = None
                     return 0 # Otherwise fail
             else:
-                return -2
+                return 0
 
 screen FDAR_settings_pane():
     python:
