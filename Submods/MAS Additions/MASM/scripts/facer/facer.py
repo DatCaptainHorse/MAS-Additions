@@ -54,7 +54,7 @@ class Facer:
 	def camFrame(minLightLevel = 0):
 		if not Facer.onCam or not Facer.onCam.isOpened():
 			print("Error: Camera not open")
-			return None
+			raise Exception("Camera not open")
 
 		ret, frame = Facer.onCam.read()
 		if not ret or frame is None:

@@ -11,6 +11,7 @@
 default persistent.submods_dathorse_FDAR_date = None
 default persistent.submods_dathorse_FDAR_todayNotified = False # Don't keep notifying on alltime topic about doing it on same day
 default persistent.submods_dathorse_FDAR_allowAccess = False
+default persistent.submods_dathorse_FDAR_keepOpen = True # Whether to keep webcam open or only open it for recognition
 default persistent.submods_dathorse_FDAR_detectionMethod = "HAAR" # Default to HAAR for faster recognition
 default persistent.submods_dathorse_FDAR_detectionTimeout = 10 # 10 seconds should be good enough, user can adjust if needed
 default persistent.submods_dathorse_FDAR_memoryTimeout = 3 # 3 seconds of larger data, starting at 60MB (math goes: 100MB * timeout / 5)
@@ -43,41 +44,69 @@ init -990 python:
         workaroundAllowState = False
         statusThread = None
         statusThreadEvent = threading.Event()
-        stateMachine = { "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False }
+        stateMachine = { "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False, "CAMCHANGE": False }
         # Screen update function
         # This is for internal use.
+        # TODO: Timeout for preparation!
         @staticmethod
         def _updateLoop():
             coolDots = "."
             lastTime = time.time()
-            while not FDAR.statusThreadEvent.is_set() and MASM.isWorking() and FDAR.stateMachine["PREPARING"]:
-                if MASM.hasDataBool("FDAR_FAILURE"):
-                    FDAR.stateMachine["PREPARING"] = False
-                    FDAR.status = "Preparing failed"
-                    renpy.restart_interaction()
-                elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT"):
-                    FDAR.stateMachine["PREPARING"] = False
-                    FDAR.status = "Not enough light"
-                    renpy.restart_interaction()
-                elif MASM.hasDataBool("FDAR_MEMORIZE_DONE"):
-                    FDAR.stateMachine["PREPARING"] = False
-                    if not FDAR.initPrepared:
-                        FDAR.initPrepared = True
-                        FDAR._memorizePlayer(removeOld = False, overrideTimeout = 1)
-                    else:
+            startTime = time.time()
+            while not FDAR.statusThreadEvent.is_set() and MASM.isWorking() and (FDAR.stateMachine["PREPARING"] or FDAR.stateMachine["CAMCHANGE"]):
+                if FDAR.stateMachine["PREPARING"]:
+                    if MASM.hasDataBool("FDAR_FAILURE"):
+                        FDAR.stateMachine["PREPARING"] = False
+                        FDAR.status = "Preparing failed"
+                        renpy.restart_interaction()
+                    elif MASM.hasDataBool("FDAR_MEMORIZE_LOWLIGHT"):
+                        FDAR.stateMachine["PREPARING"] = False
+                        FDAR.status = "Not enough light"
+                        renpy.restart_interaction()
+                    elif MASM.hasDataBool("FDAR_MEMORIZE_DONE"):
+                        FDAR.stateMachine["PREPARING"] = False
+                        if not FDAR.initPrepared:
+                            FDAR.initPrepared = True
+                            FDAR._memorizePlayer(removeOld = False, overrideTimeout = 1)
+                        else:
+                            FDAR.status = "Ready!"
+                            renpy.restart_interaction()
+                    elif MASM.hasDataBool("FDAR_NOPREPAREDATA"):
+                        if not FDAR.initPrepared: # Don't update data immediately if we are already taking initial one
+                            FDAR.initPrepared = True
+                    elif time.time() - lastTime > 1.0:
+                        FDAR.status = "Preparing, please wait{}".format(coolDots)
+                        renpy.restart_interaction()
+                        if len(coolDots) < 3:
+                            coolDots += "."
+                        else:
+                            coolDots = "."
+                        lastTime = time.time()
+                    elif time.time() - startTime >= 10: # Assume failed on timeout
+                        FDAR.stateMachine["PREPARING"] = False
+                        FDAR.status = "Preparing timed out"
+                        renpy.restart_interaction()
+                elif FDAR.stateMachine["CAMCHANGE"]:
+                    if MASM.hasDataBool("FDAR_FAILURE"):
+                        FDAR.stateMachine["CAMCHANGE"] = False
+                        FDAR.status = "Failed to open camera"
+                        renpy.restart_interaction()
+                    elif MASM.hasDataBool("FDAR_SUCCESS"):
+                        FDAR.stateMachine["CAMCHANGE"] = False
                         FDAR.status = "Ready!"
                         renpy.restart_interaction()
-                elif MASM.hasDataBool("FDAR_NOPREPAREDATA"):
-                    if not FDAR.initPrepared: # Don't update data immediately if we are already taking initial one
-                        FDAR.initPrepared = True
-                elif time.time() - lastTime > 1.0:
-                    FDAR.status = "Preparing, please wait{}".format(coolDots)
-                    renpy.restart_interaction()
-                    if len(coolDots) < 3:
-                        coolDots += "."
-                    else:
-                        coolDots = "."
-                    lastTime = time.time()
+                    elif time.time() - lastTime > 1.0:
+                        FDAR.status = "Opening camera, please wait{}".format(coolDots)
+                        renpy.restart_interaction()
+                        if len(coolDots) < 3:
+                            coolDots += "."
+                        else:
+                            coolDots = "."
+                        lastTime = time.time()
+                    elif time.time() - startTime >= 10: # Assume failed to open on timeout
+                        FDAR.stateMachine["CAMCHANGE"] = False
+                        FDAR.status = "Opening camera timed out"
+                        renpy.restart_interaction()
                 time.sleep(0.1) # Nep
             FDAR.statusThreadEvent.set() # Just-in-case set so we can reset
 
@@ -91,7 +120,6 @@ init -990 python:
                     FDAR.statusThread.join()
                 FDAR.statusThreadEvent.clear()
                 FDAR.statusThread = threading.Thread(target = FDAR._updateLoop)
-                #FDAR.statusThread.daemon = True # Just in case
                 FDAR.statusThread.start()
 
         # Sets persistents
@@ -99,8 +127,12 @@ init -990 python:
         @staticmethod
         @MASM.atStart
         def _applyPersistents():
+            if FDAR.statusThread is not None and FDAR.statusThread.is_alive():
+                FDAR._atExit()
+
             FDAR.status = None
             FDAR.workaroundAllowState = False
+            FDAR._setKeepOpen(persistent.submods_dathorse_FDAR_keepOpen)
             FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
             FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
             FDAR._setDetectionMethod(persistent.submods_dathorse_FDAR_detectionMethod)
@@ -121,18 +153,44 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _memorizePlayer(removeOld = False, duringRecognize = False, overrideTimeout = 0):
-            if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
                 FDAR.status = "Memorize requested"
                 if not duringRecognize:
+                    FDAR.status = "Preparing, please wait"
+                    renpy.restart_interaction()
                     FDAR.stateMachine["PREPARING"] = True
                     FDAR._startScreenUpdate()
                 MASM.sendData("FDAR_MEMORIZE", (removeOld, overrideTimeout))
+
+        # Sets whether webcam should stay open or not.
+        # This is for internal use.
+        @staticmethod
+        def _setKeepOpen(keepopen):
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
+                if FDAR.initPrepared and keepopen:
+                    FDAR.status = "Opening camera, please wait"
+                    renpy.restart_interaction()
+                    FDAR.stateMachine["CAMCHANGE"] = True
+                    FDAR._startScreenUpdate()
+                MASM.sendData("FDAR_KEEPOPEN", keepopen)
+                persistent.submods_dathorse_FDAR_keepOpen = keepopen
+
+        # Switches whether webcam should stay open or not.
+        # This is for internal use.
+        @staticmethod
+        def _switchKeepOpen():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
+                if not persistent.submods_dathorse_FDAR_keepOpen:
+                    persistent.submods_dathorse_FDAR_keepOpen = True
+                else:
+                    persistent.submods_dathorse_FDAR_keepOpen = False
+                FDAR._setKeepOpen(persistent.submods_dathorse_FDAR_keepOpen)
 
         # Sets whether webcam access is allowed or not.
         # This is mainly for internal use. However if you wish to have dialogue where Monika changes access herself, it's fine to use this.
         @staticmethod
         def _setAllowAccess(allowed):
-            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 if allowed and not FDAR.workaroundAllowState:
                     MASM.sendData("FDAR_ALLOWACCESS", allowed)
                     FDAR.status = "Access allowed"
@@ -148,7 +206,7 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _switchAllowAccess():
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 if not persistent.submods_dathorse_FDAR_allowAccess:
                     persistent.submods_dathorse_FDAR_allowAccess = True
                 else:
@@ -159,7 +217,7 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _setTimeout(timeout):
-            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 MASM.sendData("FDAR_SETTIMEOUT", timeout)
                 persistent.submods_dathorse_FDAR_detectionTimeout = timeout
 
@@ -167,7 +225,7 @@ init -990 python:
         # This is for internal use
         @staticmethod
         def _switchTimeout():
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 if persistent.submods_dathorse_FDAR_detectionTimeout == 5:
                     persistent.submods_dathorse_FDAR_detectionTimeout = 10
                 elif persistent.submods_dathorse_FDAR_detectionTimeout == 10:
@@ -182,7 +240,7 @@ init -990 python:
         # This is for internal use.
         @staticmethod
         def _setMemoryTimeout(timeout):
-            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 MASM.sendData("FDAR_SETMEMORYTIMEOUT", timeout)
                 persistent.submods_dathorse_FDAR_memoryTimeout = timeout
 
@@ -190,7 +248,7 @@ init -990 python:
         # This is for internal use
         @staticmethod
         def _switchMemoryTimeout():
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 if persistent.submods_dathorse_FDAR_memoryTimeout == 3:
                     persistent.submods_dathorse_FDAR_memoryTimeout = 4
                 elif persistent.submods_dathorse_FDAR_memoryTimeout == 4:
@@ -212,14 +270,14 @@ init -990 python:
         # Sets detection method, for internal use
         @staticmethod
         def _setDetectionMethod(method):
-            if not FDAR.stateMachine["PREPARING"] and MASM.isWorking():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 MASM.sendData("FDAR_DETECTIONMETHOD", method)
                 persistent.submods_dathorse_FDAR_detectionMethod = method
 
         # Switches detection, for internal use
         @staticmethod
         def _switchDetectionMethod():
-            if not FDAR.stateMachine["PREPARING"]:
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and MASM.isWorking():
                 if persistent.submods_dathorse_FDAR_detectionMethod == "HAAR":
                     persistent.submods_dathorse_FDAR_detectionMethod = "DNN"
                 else:
@@ -236,7 +294,7 @@ init -990 python:
         # Returns False if re-memorize is running, access is disabled or MASM is not working, True otherwise
         @staticmethod
         def canRecognize():
-            if not FDAR.stateMachine["PREPARING"] and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
+            if not FDAR.stateMachine["PREPARING"] and not FDAR.stateMachine["CAMCHANGE"] and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
                 return True
             else:
                 return False
@@ -248,11 +306,13 @@ init -990 python:
         timeoutTime = None
         extraTimeOnce = False
         timedOutOnce = False
+        keepOpenTimedOutOnce = False
         @staticmethod
         def canSee(person = "Player"):
             if FDAR.canRecognize():
                 if not FDAR.stateMachine["RECOGNIZING"] and not FDAR.stateMachine["MEMORIZING"]:
-                    MASM.sendData("FDAR_RECOGNIZEONCE", person)
+                    if not FDAR.keepOpenTimedOutOnce:
+                        MASM.sendData("FDAR_RECOGNIZEONCE", person)
                     FDAR.stateMachine["RECOGNIZING"] = True
                     FDAR.timeoutTime = time.time()
                     FDAR.extraTimeOnce = False
@@ -290,12 +350,14 @@ init -990 python:
                             MASM.hasDataBool("FDAR_FAILURE") # Clear out possible old result just in case
                             FDAR.stateMachine["RECOGNIZING"] = False
                             FDAR.stateMachine["MEMORIZING"] = False
+                            FDAR.keepOpenTimedOutOnce = False
                             FDAR.timedOutOnce = False
                             return 0
                         elif MASM.hasDataValue("FDAR_RECOGNIZED") == person:
                             MASM.hasDataBool("FDAR_RECOGNIZED") # And here..
                             FDAR.stateMachine["RECOGNIZING"] = False
                             FDAR.stateMachine["MEMORIZING"] = False
+                            FDAR.keepOpenTimedOutOnce = False
                             FDAR.timedOutOnce = False
                             return 1
 
@@ -304,11 +366,16 @@ init -990 python:
                 FDAR.stateMachine["RECOGNIZING"] = False
                 FDAR.stateMachine["MEMORIZING"] = False
                 if not FDAR.timedOutOnce and MASM.isWorking():
-                    FDAR.timedOutOnce = True
-                    FDAR.timeoutTime = time.time() # Reset timer
-                    return -3 # Return timeout only once
+                    if not persistent.submods_dathorse_FDAR_keepOpen and not FDAR.keepOpenTimedOutOnce:
+                        FDAR.keepOpenTimedOutOnce = True # Webcam opening can take time
+                        return -2
+                    else:
+                        FDAR.timedOutOnce = True
+                        FDAR.timeoutTime = time.time() # Reset timer
+                        return -3 # Return timeout only once
                 else:
                     MASM.sendData("FDAR_RECOGNIZESTOP")
+                    FDAR.keepOpenTimedOutOnce = False
                     FDAR.extraTimeOnce = False
                     FDAR.timedOutOnce = False
                     FDAR.lightTime = None
@@ -344,6 +411,15 @@ screen FDAR_settings_pane():
         else:
             textbutton _("Allow webcam access: {}".format(persistent.submods_dathorse_FDAR_allowAccess)):
                 action Function(FDAR._switchAllowAccess)
+
+        if _tooltip:
+            textbutton _("Keep webcam open: {}".format(persistent.submods_dathorse_FDAR_keepOpen)):
+                action Function(FDAR._switchKeepOpen)
+                hovered SetField(_tooltip, "value", "Toggle whether webcam should stay open even if recognition is not happening. Keep this on if your webcam opens slowly.")
+                unhovered SetField(_tooltip, "value", _tooltip.default)
+        else:
+            textbutton _("Keep webcam open: {}".format(persistent.submods_dathorse_FDAR_keepOpen)):
+                action Function(FDAR._switchKeepOpen)
                 
         if _tooltip:
             textbutton _("Detection method: {}".format(persistent.submods_dathorse_FDAR_detectionMethod)):
