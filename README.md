@@ -18,10 +18,11 @@ https://github.com/Monika-After-Story/MonikaModDev
 
 ## Credits
 
-*  DatHorse, self-explanatory (Discord: DatHorse#9516)
-*  LordBaaa, helping to test new features [Github user page](https://github.com/LordBaaa)
-*  bin, helping with code [Github user page](https://github.com/flumf)
-*  SykkNyzz, helping to test Linux support.
+*  DatHorse, self-explanatory. (Discord: DatHorse#9516)
+*  LordBaaa, helping to test new features. [Github user page](https://github.com/LordBaaa)
+*  bin, helping with code and Linux binary builds. [Github user page](https://github.com/flumf)
+*  SykkNyzz, helping to test Linux support and suggesting features.
+*  multimokia, helping with code and implementations. [Github user page](https://github.com/multimokia).
 
 ## Reporting bugs and issues
 
