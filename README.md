@@ -5,7 +5,7 @@ Additions for Monika After Story mod for DDLC
 https://github.com/Monika-After-Story/MonikaModDev
 
 
-# Additions
+## Additions
 * MASM. MAS Module is an external program which enables the use of Python 3. Audio and Graphics features have been disabled for now. Required by other additions below.
 
 * Face Detection and Recognition. allows for Monika to see you. API for other Submods to use the feature.
@@ -16,14 +16,14 @@ https://github.com/Monika-After-Story/MonikaModDev
 1. Go to Releases link visible on the right side.
 2. Install instructions are listed on the latest release.
 
-# Credits
+## Credits
 
 *  DatHorse, self-explanatory (Discord: DatHorse#9516)
 *  LordBaaa, helping to test new features [Github user page](https://github.com/LordBaaa)
 *  bin, helping with code [Github user page](https://github.com/flumf)
 *  SykkNyzz, helping to test Linux support.
 
-# Reporting bugs and issues
+## Reporting bugs and issues
 
 Report any bugs and issues you may have to the Issues tab.
 
