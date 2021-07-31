@@ -48,6 +48,9 @@ class Facer:
 	class LightLevelLow(Exception):
 		pass
 
+	class NoFacesFound(Exception):
+		pass
+
 	# Returns frame on success, None if camera cannot be opened or None if reading frame failed
 	# Parameter minLightLevel specifies the minimum brightness allowed, if brightness is too low LightLevelLow is thrown
 	@staticmethod
@@ -84,9 +87,10 @@ class Facer:
 		Facer.camClearBuffer()
 
 		facelist = []
+		lastTime = time.time()
 		startTime = time.time()
+		forcedTimeout = timeout * 2 # Forced timeout limit, if we can't find faces by then we fail
 		while time.time() - startTime < timeout:
-			dt = time.time()
 			if count > 0 and completed >= count:
 				break
 
@@ -101,7 +105,6 @@ class Facer:
 				raise
 
 			if frame is None:
-				timeout += time.time() - dt
 				continue
 
 			# Use DNN for taking faces always, way more accurate even if it takes longer
@@ -112,7 +115,11 @@ class Facer:
 				faces = Facer.detect_faces_haar(frame)
 
 			if faces is None or len(faces) == 0:
-				timeout += time.time() - dt
+				if time.time() - lastTime > 0.1: # Raise timeout each 100ms if face isn't found
+					timeout += 0.1
+					lastTime = time.time()
+				if timeout >= forcedTimeout: # We stop trying if faces simply can't be found
+					raise Facer.NoFacesFound
 				continue
 
 			facelist.append(faces[0]) # Append first found face

@@ -16,7 +16,7 @@ failTimeout = 10
 memoryTimeout = 3
 lastAccess = False
 preparedYet = False
-keepWebcamOpen = True
+keepWebcamOpen = None
 
 detcThread = None
 detcRun = threading.Event()
@@ -56,16 +56,19 @@ def facePrepare(retake = False, overrideTimeout = 0):
 		else:
 			print("No face-data found, taking..")
 			socketer.sendData("FDAR_NOPREPAREDATA")
+
+		chosenTimeout = memoryTimeout
+		if overrideTimeout > 0:
+			chosenTimeout = overrideTimeout
 		try:
-			chosenTimeout = memoryTimeout
-			if overrideTimeout > 0:
-				chosenTimeout = overrideTimeout
 			if not keepWebcamOpen and not Facer.camOn():
 				SE.Log("Camera failed to open")
 				if not Facer.camOff():
 					SE.Log("Camera failed to close?")
 				return False
 			if not Facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, minLightLevel = 15):
+				if not keepWebcamOpen and not Facer.camOff():
+					SE.Log("Camera failed to close?")
 				return False
 			if not keepWebcamOpen and not Facer.camOff():
 				SE.Log("Camera failed to close?")
@@ -73,6 +76,11 @@ def facePrepare(retake = False, overrideTimeout = 0):
 			if not keepWebcamOpen and not Facer.camOff():
 				SE.Log("Camera failed to close?")
 			raise
+		except Facer.NoFacesFound:
+			SE.Log(f"Face couldn't be found within {chosenTimeout*2}s")
+			if not keepWebcamOpen and not Facer.camOff():
+				SE.Log("Camera failed to close?")
+			return False
 		except Exception as e:
 			SE.Log(f"Exception on taking data: {e}")
 			if not keepWebcamOpen and not Facer.camOff():
