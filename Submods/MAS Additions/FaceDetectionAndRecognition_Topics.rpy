@@ -104,12 +104,10 @@ label submods_dathorse_facedetection_anytime:
 
 label submods_dathorse_facedetection_anytime_pre:
     $ ev = mas_getEV("submods_dathorse_facedetection_anytime")
-    if ev.shown_count == 0:
-        m 1dsd "Look towards the camera...{nw}"
-    elif ev.shown_count >= 1 and (mas_pastOneDay(persistent.submods_dathorse_FDAR_date) or persistent.submods_dathorse_FDAR_todayNotified):
-        m 1dsb "Smile towards the camera...{nw}"
+    if ev.shown_count >= 1 and (mas_pastOneDay(persistent.submods_dathorse_FDAR_date) or persistent.submods_dathorse_FDAR_todayNotified):
+        m 1hsa "Smile towards the camera...{nw}"
     else:
-        m 1dsb "Look towards the camera...{nw}"
+        m 1hsb "Look towards the camera...{nw}"
         
 label submods_dathorse_facedetection_anytime_main:
     if FDAR.allowedToRecognize():

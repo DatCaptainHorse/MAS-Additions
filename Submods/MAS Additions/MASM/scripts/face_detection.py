@@ -2,7 +2,7 @@ import os
 import time
 import shutil
 import pathlib
-import socketer
+from socketer import MASM
 import threading
 from facer import Facer
 
@@ -11,7 +11,7 @@ pDataPath = None
 pLBPHPath = None
 pNamePath = None
 
-useDNN = False
+detcMethod = 0 # 0 HAAR, 1 DNN, 2 BOTH
 failTimeout = 10
 memoryTimeout = 3
 lastAccess = False
@@ -24,11 +24,11 @@ detcLock = threading.Lock()
 
 # Prepares face-data
 def facePrepare(retake = False, overrideTimeout = 0):
-	global useDNN
 	global masmPath
 	global pDataPath
 	global pLBPHPath
 	global pNamePath
+	global detcMethod
 	global preparedYet
 	global memoryTimeout
 	global keepWebcamOpen
@@ -55,7 +55,7 @@ def facePrepare(retake = False, overrideTimeout = 0):
 				retake = True
 		else:
 			print("No face-data found, taking..")
-			socketer.sendData("FDAR_NOPREPAREDATA")
+			MASM.sendData("FDAR_NOPREPAREDATA")
 
 		chosenTimeout = memoryTimeout
 		if overrideTimeout > 0:
@@ -66,7 +66,10 @@ def facePrepare(retake = False, overrideTimeout = 0):
 				if not Facer.camOff():
 					SE.Log("Camera failed to close?")
 				return False
-			if not Facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, minLightLevel = 15):
+			takeDNN = False
+			if detcMethod == 1 or detcMethod == 2:
+				takeDNN = True
+			if not Facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, useDNN = takeDNN, minLightLevel = 15):
 				if not keepWebcamOpen and not Facer.camOff():
 					SE.Log("Camera failed to close?")
 				return False
@@ -89,17 +92,17 @@ def facePrepare(retake = False, overrideTimeout = 0):
 
 		try:
 			if not Facer.train_faces_lbph(recreate = retake):
-				socketer.sendData("FDAR_FAILURE")
+				MASM.sendData("FDAR_FAILURE")
 				return False
 		except Exception as e:
 			SE.Log(f"Exception on train: {e}")
-			socketer.sendData("FDAR_FAILURE")
+			MASM.sendData("FDAR_FAILURE")
 
 		try:
 			Facer.save_trained_lbph(str(pLBPHPath), str(pNamePath))
 		except Exception as e:
 			SE.Log(f"Exception on save: {e}")
-			socketer.sendData("FDAR_FAILURE")
+			MASM.sendData("FDAR_FAILURE")
 
 		preparedYet = True
 
@@ -110,12 +113,14 @@ class DataNotPrepared(Exception):
 	pass
 
 threshold = 0.6
+methodSwitch = False
 # Recognizes all known people
 # Returns list of recognized names
 def recognizeKnown():
-	global useDNN
 	global threshold
+	global detcMethod
 	global preparedYet
+	global methodSwitch
 	if not preparedYet:
 		SE.Log("Tried to recognize before data is prepared")
 		raise DataNotPrepared
@@ -127,14 +132,20 @@ def recognizeKnown():
 			raise
 		except Exception as e:
 			SE.Log(f"Capture frame exception: {e}")
-			socketer.sendData("FDAR_FAILURE")
+			MASM.sendData("FDAR_FAILURE")
 			return None
 		else:
 			try:
-				found, people = Facer.recognize_faces_lbph(frame, threshold, useDNN)
+				if detcMethod == 0:
+					methodSwitch = False
+				elif detcMethod == 1:
+					methodSwitch = True
+				elif detcMethod == 2:
+					methodSwitch = not methodSwitch
+				found, people = Facer.recognize_faces_lbph(frame, threshold, methodSwitch)
 			except Exception as e:
 				SE.Log(f"LBPH recognizing exception: {e}")
-				#socketer.sendData("FDAR_FAILURE") # Disabled cuz hitting Python's nerve or something causing exception with random number, randomly. Works despite that
+				#MASM.sendData("FDAR_FAILURE") # Disabled cuz hitting Python's nerve or something causing exception with random number, randomly. Works despite that
 				return None
 			else:
 				if found:
@@ -155,12 +166,11 @@ def recognizeKnown():
 				else:
 					SE.Log("Found nobody")
 					return None
-	socketer.sendData("FDAR_FAILURE")
+	MASM.sendData("FDAR_FAILURE")
 	return None
 	
 # Non-blocking recognizion loop
 def _recognizeLoop():
-	global useDNN
 	global detcRun
 	global lastAccess
 	global preparedYet
@@ -171,20 +181,20 @@ def _recognizeLoop():
 		try:
 			if not facePrepare():
 				SE.Log("Failed to prepare data")
-				socketer.sendData("FDAR_FAILURE")
+				MASM.sendData("FDAR_FAILURE")
 			else:
-				socketer.sendData("FDAR_MEMORIZE_DONE")
+				MASM.sendData("FDAR_MEMORIZE_DONE")
 		except Facer.LightLevelLow:
 			SE.Log("Low-light on prepare")
-			socketer.sendData("FDAR_MEMORIZE_LOWLIGHT")
+			MASM.sendData("FDAR_MEMORIZE_LOWLIGHT")
 		except Exception as e:
 			SE.Log(f"Exception when preparing: {e}")
-			socketer.sendData("FDAR_FAILURE")
+			MASM.sendData("FDAR_FAILURE")
 			return
 			
 	lastTime = time.time()
 	while not detcRun.is_set():
-		toMemorize = socketer.hasDataValue("FDAR_MEMORIZE")
+		toMemorize = MASM.hasDataValue("FDAR_MEMORIZE")
 		if toMemorize is not None and lastAccess:
 			try:
 				(removeOld, override) = toMemorize
@@ -192,34 +202,34 @@ def _recognizeLoop():
 					preparedYet = False
 				if not facePrepare(retake = removeOld, overrideTimeout = override):
 					SE.Log("Failed to memorize")
-					socketer.sendData("FDAR_FAILURE")
+					MASM.sendData("FDAR_FAILURE")
 				else:
-					socketer.sendData("FDAR_MEMORIZE_DONE")
+					MASM.sendData("FDAR_MEMORIZE_DONE")
 			except Facer.LightLevelLow:
 				SE.Log("Low-light on memorize")
-				socketer.sendData("FDAR_MEMORIZE_LOWLIGHT")
+				MASM.sendData("FDAR_MEMORIZE_LOWLIGHT")
 			except Exception as e:
 				SE.Log(f"Exception on memorize: {e}")
-				socketer.sendData("FDAR_FAILURE")
+				MASM.sendData("FDAR_FAILURE")
 		
 		shouldRecognize = False
-		toRecognize = socketer.hasDataValue("FDAR_RECOGNIZEONCE")
+		toRecognize = MASM.hasDataValue("FDAR_RECOGNIZEONCE")
 		if toRecognize is not None and lastAccess:
 			if not preparedYet:
 				SE.Log("Memory not prepared for recognition")
-				socketer.sendData("FDAR_NOTMEMORIZED")
+				MASM.sendData("FDAR_NOTMEMORIZED")
 			else:
 				shouldRecognize = True
 
 		if shouldRecognize:
 			if not keepWebcamOpen and not Facer.camOn():
 				SE.Log("Camera failed to open")
-				socketer.sendData("FDAR_FAILURE")
+				MASM.sendData("FDAR_FAILURE")
 				shouldRecognize = False
 			else:
 				startTime = time.time()
 				while time.time() - startTime < failTimeout:
-					if socketer.hasDataBool("FDAR_RECOGNIZESTOP"):
+					if MASM.hasDataBool("FDAR_RECOGNIZESTOP"):
 						shouldRecognize = False
 						break
 					elif time.time() - lastTime > 1.0: # Ease up on loop, attempt every second
@@ -227,19 +237,19 @@ def _recognizeLoop():
 							res = recognizeKnown()
 						except Facer.LightLevelLow:
 							SE.Log("Low-light on recognize")
-							socketer.sendData("FDAR_LOWLIGHT") # No breaking here so we can fail eventually as we want to keep trying
+							MASM.sendData("FDAR_LOWLIGHT") # No breaking here so we can fail eventually as we want to keep trying
 						except DataNotPrepared:
 							shouldRecognize = False
 							break # We don't want to deal with this here.. Trust me I tried
 						except Exception as e:
 							SE.Log(f"Recognizing known exception: {e}")
-							socketer.sendData("FDAR_FAILURE")
+							MASM.sendData("FDAR_FAILURE")
 							shouldRecognize = False
 							break
 						else:
 							if res is not None:
 								for recognized in res:
-									socketer.sendData("FDAR_RECOGNIZED", recognized)
+									MASM.sendData("FDAR_RECOGNIZED", recognized)
 								if toRecognize in res:
 									shouldRecognize = False
 									break
@@ -250,13 +260,14 @@ def _recognizeLoop():
 				if not keepWebcamOpen and not Facer.camOff():
 					SE.Log("Camera failed to close?")
 
-				if socketer.hasDataBool("FDAR_RECOGNIZESTOP"):
+				if MASM.hasDataBool("FDAR_RECOGNIZESTOP"):
 					pass # Clear this so next recognitions won't fail immediately if duplicate data is received
 
 		time.sleep(1) # No hogging CPU and data-locks!
 
 def Update():
 	global detcRun
+	global detcMethod
 	global lastAccess
 	global detcThread
 	global preparedYet
@@ -264,35 +275,39 @@ def Update():
 	global memoryTimeout
 	global keepWebcamOpen
 	# TODO: Recognize multiple people?
-	newKeepOpen = socketer.hasDataValue("FDAR_KEEPOPEN")
+	newKeepOpen = MASM.hasDataValue("FDAR_KEEPOPEN")
 	if newKeepOpen is not None:
-		if keepWebcamOpen and not newKeepOpen and not Facer.camOff():
-			SE.Log("Camera failed to close?")
-		elif not keepWebcamOpen and newKeepOpen:
-			if not Facer.camOn():
-				SE.Log("Camera failed to open")
-			else:
-				Facer.camFrame() # Turn on light
-				socketer.sendData("FDAR_SUCCESS")
+		if lastAccess:
+			if keepWebcamOpen and not newKeepOpen and not Facer.camOff():
+				SE.Log("Camera failed to close?")
+			elif not keepWebcamOpen and newKeepOpen:
+				if not Facer.camOn():
+					SE.Log("Camera failed to open")
+					MASM.sendData("FDAR_FAILURE")
+				else:
+					Facer.camFrame() # Turn on light
+					MASM.sendData("FDAR_CAMON")
 		keepWebcamOpen = newKeepOpen
 
-	newTimeout = socketer.hasDataValue("FDAR_SETTIMEOUT")
+	newTimeout = MASM.hasDataValue("FDAR_SETTIMEOUT")
 	if newTimeout and newTimeout > 0:
 		failTimeout = newTimeout
 
-	newMemoryTime = socketer.hasDataValue("FDAR_SETMEMORYTIMEOUT")
+	newMemoryTime = MASM.hasDataValue("FDAR_SETMEMORYTIMEOUT")
 	if newMemoryTime and newMemoryTime > 0:
 		memoryTimeout = newMemoryTime
 
-	method = socketer.hasDataValue("FDAR_DETECTIONMETHOD")
+	method = MASM.hasDataValue("FDAR_DETECTIONMETHOD")
 	if method is not None:
 		if method == "HAAR":
-			useDNN = False
+			detcMethod = 0
 		elif method == "DNN":
-			useDNN = True
+			detcMethod = 1
+		elif method == "BOTH":
+			detcMethod = 2
 
 	# Message tells whether we are allowed to recognize or not
-	allowAccess = socketer.hasDataValue("FDAR_ALLOWACCESS")
+	allowAccess = MASM.hasDataValue("FDAR_ALLOWACCESS")
 	if allowAccess is True and allowAccess != lastAccess:
 		try:
 			SE.Log("Recognition allowed")

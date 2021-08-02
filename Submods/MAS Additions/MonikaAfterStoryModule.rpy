@@ -265,7 +265,6 @@ screen MASM_settings_pane():
         else:
             statusStr = "Not Ready"
 
-        strDataSize = len(MASM.data)
         strTiming = "{:.2f}".format(MASM.timing)
         strPath = str(MASM.path)
     vbox:
@@ -275,8 +274,7 @@ screen MASM_settings_pane():
         style_prefix "check"
 
         text "MASM Status: [statusStr]"
-        text "MASM Time/Ping: [strTiming]ms"
-        text "MASM cached data: [strDataSize]"
+        text "MASM Startup/Ping time: [strTiming]ms"
         text "MASM PID: [subprocPID]"
         text "MASM Path: [strPath]"
         
