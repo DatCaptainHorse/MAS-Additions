@@ -13,10 +13,10 @@ init 5 python:
     addEvent(
         Event(
             persistent.event_database,
-            eventlabel="submods_dathorse_facedetection_firsttime",
+            eventlabel="submods_dathorse_facedetection_override_monika_playersface",
             category=["mod"],
             prompt="Webcam",
-            conditional="not renpy.seen_label('submods_dathorse_facedetection_firsttime')",
+            conditional="not renpy.seen_label('submods_dathorse_facedetection_firsttime') and not renpy.seen_label('monika_playersface') and not renpy.seen_label('submods_dathorse_facedetection_override_monika_playersface')",
             action=EV_ACT_QUEUE,
             aff_range=(mas_aff.NORMAL, None)
         )
@@ -34,10 +34,18 @@ init 5 python:
         )
     )
 
+    mas_override_label("monika_playersface", "submods_dathorse_facedetection_override_monika_playersface")
+
+# Hijacking the original face topic..
+label submods_dathorse_facedetection_override_monika_playersface:
+    m 5eua "You know, I sometimes wonder..."
+    m "I always think about what your face actually looks like..."
+    m 5hua "Just being able to constantly see that adoring smile of yours would be so exciting!"
+    m 5lkc "If only the game could somehow use a webcam or something that's connected to the computer..."
+
 # Initial face-detection topic
 label submods_dathorse_facedetection_firsttime:
-    m 1eub "It would be nice if I could see you [player]."
-    m 2eud "Wait I could..."
+    m 2eud "Wait, I could..."
     menu:
         m "Do you have a webcam, [player]?"
         "Yes":

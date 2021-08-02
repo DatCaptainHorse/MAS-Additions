@@ -74,7 +74,7 @@ init -990 python:
                     elif MASM.hasDataBool("FDAR_MEMORIZE_DONE"):
                         if not FDAR.initPrepared:
                             FDAR.initPrepared = True
-                            MASM.sendData("FDAR_MEMORIZE", (False, 1)) # Manually doing this here
+                            MASM.sendData("FDAR_MEMORIZE", (False, 1)) # Manually doing this here # TODO: Need somehow to keep cam on so it doens't need to reopen
                         else:
                             FDAR.stateMachine["PREPARING"] = False
                             FDAR.status = "Prepared, ready!"
