@@ -109,11 +109,12 @@ init 811 python:
 
             return super(PianoDisplayableOverride, self).render(ev, x, y, st)
 
-    mas_override_label("mas_piano_start", "submods_dathorse_MIDI_override_piano_start")
-    mas_override_label("mas_piano_loopstart", "submods_dathorse_MIDI_override_piano_loopstart")
-    mas_override_label("mas_piano_songchoice", "submods_dathorse_MIDI_override_piano_songchoice")
-    mas_override_label("mas_piano_setupstart", "submods_dathorse_MIDI_override_piano_setupstart")
-    mas_override_label("mas_piano_loopend", "submods_dathorse_MIDI_override_piano_loopend")
+    if config.version == "0.12.2":
+        mas_override_label("mas_piano_start", "submods_dathorse_MIDI_override_piano_start")
+        mas_override_label("mas_piano_loopstart", "submods_dathorse_MIDI_override_piano_loopstart")
+        mas_override_label("mas_piano_songchoice", "submods_dathorse_MIDI_override_piano_songchoice")
+        mas_override_label("mas_piano_setupstart", "submods_dathorse_MIDI_override_piano_setupstart")
+        mas_override_label("mas_piano_loopend", "submods_dathorse_MIDI_override_piano_loopend")
 
 label submods_dathorse_MIDI_override_piano_start:
     $ import store.mas_piano_keys as mas_piano_keys
