@@ -275,11 +275,11 @@ class Facer:
 			for index, data in Facer.people.items():
 				labels = []
 				datalist = []
-				for d in data:
+				for d in data: # TODO HERE: Add prints for loop values
 					labels.append(index)
 					datalist.append(d)
 
-				if len(labels) > 0 and len(datalist) > 0:
+				if len(labels) > 0 and len(datalist) > 0 and len(labels) == len(datalist):
 					if requireOneTime is True:
 						requireOneTime = False
 						Facer.face_recognizer_lbph.train(datalist, np.array(labels))
@@ -289,6 +289,7 @@ class Facer:
 						print("Updated")
 				else:
 					print("Error: Empty or mismatched data")
+					return False
 		except Exception as e:
 			print(f"Failed, reason: {e}")
 			return False
