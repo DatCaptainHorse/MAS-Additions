@@ -77,7 +77,7 @@ init -991 python:
                         sInfo = None
                         if renpy.windows: # Hide external cmd popup in Windows
                             sInfo = subprocess.STARTUPINFO()
-                            sInfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        #    sInfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                         MASM.subProc = subprocess.Popen(MASM.path, startupinfo=sInfo)
                         MASM.status = "Subprocess was created"
                     except:

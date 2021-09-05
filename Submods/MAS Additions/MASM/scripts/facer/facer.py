@@ -86,6 +86,8 @@ class Facer:
 
 		Facer.camClearBuffer()
 
+		print(f"Taking faces, useDNN:{useDNN}")
+
 		facelist = []
 		lastTime = time.time()
 		startTime = time.time()
@@ -272,13 +274,16 @@ class Facer:
 
 		print("Training LBPH.. ", end="")
 		try:
+			print(f"\nPeople length: {len(Facer.people)}")
 			for index, data in Facer.people.items():
+				print(f"Index: {index}, Data length: {len(data)}")
 				labels = []
 				datalist = []
-				for d in data: # TODO HERE: Add prints for loop values
+				for d in data:
 					labels.append(index)
 					datalist.append(d)
 
+				print(f"Labels length: {len(labels)}, Datalist length: {len(datalist)}")
 				if len(labels) > 0 and len(datalist) > 0 and len(labels) == len(datalist):
 					if requireOneTime is True:
 						requireOneTime = False
