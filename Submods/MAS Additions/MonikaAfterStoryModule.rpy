@@ -11,6 +11,7 @@
 # - Subprocess console hiding on Windows
 # - Bunch of painful testing so stuff is stable, might still have a rare edge-case somewhere..
 # - Binary is no longer hogging the CPU
+# - Persistent option to allow manually running MASM on those systems where running as subprocess doesn't work for some reason..
 # 2.0.0
 # - Reworked for MAS official Submod framework, made versioning make more sense by shifting to major from minor versioning.
 # - UDP is now default, as it allows for connectionless data transfer without headaches of checking whether TCP connected or not.
@@ -18,6 +19,8 @@
 # - Removed remData, well keep a short array of recently received data and discard any old or looked up data.
 # - Renamed to short and simple MASM for less word spaghetti, also some functions to make more sense.
 # - Thread locks that hopefully fix any issues with reading data partially from somewhere before all is received.
+
+default persistent.submods_dathorse_MASM_manual = False
 
 init -990 python:
     store.mas_submod_utils.Submod(
@@ -114,9 +117,9 @@ init -991 python:
                     MASM.commThread = threading.Thread(target = MASM._communicationLoop)
                     MASM.commThread.daemon = True
                     MASM.commThread.start()
-                    MASM.status = "Thread was started"
+                    MASM.status = "Communication thread was started, waiting for response"
                 except:
-                    MASM.status = "Unable to create thread"
+                    MASM.status = "Unable to create communication thread"
                     return False
                 MASM.initialized = 2
             return True
@@ -137,7 +140,7 @@ init -991 python:
                     MASM.subProc.terminate() # Try kind form of termination first
                     time.sleep(0.25) # Slight delay so signal can pass
                     if MASM.subProc.poll():
-                        MASM.subProc.kill() # If that doesn't work, take a shot
+                        MASM.subProc.kill() # If that doesn't work, take the shot
                     MASM.subProc = None
                 except:
                     pass # At this point just.. yea
@@ -168,7 +171,7 @@ init -991 python:
                 except socket.error:
                     pass # Probably due to subprocess dying
 
-                if MASM.subProc.poll() is not None: # If subprocess died prematurely
+                if not persistent.submods_dathorse_MASM_manual and MASM.subProc.poll() is not None: # If subprocess died prematurely
                     MASM.status = "Subprocess closed"
                     MASM.initialized = 1
                     MASM.communicationRun.set()
@@ -179,7 +182,7 @@ init -991 python:
             MASM._stopMASM()
             MASM.startTime = time.time()
             if MASM._connectMASM():
-                if MASM._startThreadMASM():
+                if MASM._startThreadMASM() and not persistent.submods_dathorse_MASM_manual:
                     MASM._openMASM()
 
         @staticmethod
@@ -231,7 +234,7 @@ init -991 python:
         # Returns True or False depending if MASM was initialized fully and is currently working
         @staticmethod
         def isWorking():
-            if MASM.initialized == 3:
+            if MASM.initialized == 3 or (persistent.submods_dathorse_MASM_manual and MASM.initialized == 2):
                 return True
             else:
                 return False
@@ -241,6 +244,15 @@ init -991 python:
         @staticmethod
         def atStart(func):
             MASM.atStartCalls.append(func)
+        
+        # Switches whether user manually wants to open MASM.
+        # This is for internal use.
+        @staticmethod
+        def _switchManualOpen():
+            if not persistent.submods_dathorse_MASM_manual:
+                persistent.submods_dathorse_MASM_manual = True
+            else:
+                persistent.submods_dathorse_MASM_manual = False
 
 init -989 python:
     # Initialize Monika After Story Module
@@ -282,7 +294,7 @@ screen MASM_settings_pane():
             if _tooltip:
                 textbutton _("Test Packet"):
                     action Function(MASM._ping)
-                    hovered SetField(_tooltip, "value", "For debugging purposes, sends a ping packet")
+                    hovered SetField(_tooltip, "value", "For debugging purposes, sends a ping packet.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Test Packet"):
@@ -291,8 +303,17 @@ screen MASM_settings_pane():
             if _tooltip:
                 textbutton _("Restart MASM"):
                     action Function(MASM._startFull)
-                    hovered SetField(_tooltip, "value", "For debugging purposes, restarts MASM")
+                    hovered SetField(_tooltip, "value", "For debugging purposes, restarts MASM. If you are opening MASM manually you need to restart it yourself.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Restart MASM"):
                     action Function(MASM._startFull)
+
+            if _tooltip:
+                textbutton _("Manually open MASM: {}".format(persistent.submods_dathorse_MASM_manual)):
+                    action Function(MASM._switchManualOpen)
+                    hovered SetField(_tooltip, "value", "If you have issues with MASM not opening, toggle this on and open it up manually.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Manually open MASM: {}".format(persistent.submods_dathorse_MASM_manual)):
+                    action Function(MASM._switchManualOpen)
