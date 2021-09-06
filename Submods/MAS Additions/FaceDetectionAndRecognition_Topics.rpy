@@ -5,36 +5,34 @@ init 5 python:
     if persistent.submods_dathorse_FDAR_date is None: # If not initialized yet, set as yesterday so rest goes smoothly
         persistent.submods_dathorse_FDAR_date = datetime.date.today() - datetime.timedelta(days=1)
 
-    if persistent.submods_dathorse_FDAR_todayNotified and mas_pastOneDay(persistent.submods_dathorse_FDAR_date):
-        persistent.submods_dathorse_FDAR_todayNotified = False
+        if persistent.submods_dathorse_FDAR_todayNotified and mas_pastOneDay(persistent.submods_dathorse_FDAR_date):
+            persistent.submods_dathorse_FDAR_todayNotified = False
+            submods_dathorse_facedetection_topics_bigOneToday = False
 
-    submods_dathorse_facedetection_topics_bigOneToday = False
+            addEvent(
+                Event(
+                    persistent.event_database,
+                    eventlabel="submods_dathorse_facedetection_override_monika_playersface",
+                    category=["mod"],
+                    prompt="Webcam",
+                    conditional="if FDAR.canRecognize() and not renpy.seen_label('submods_dathorse_facedetection_firsttime') and not renpy.seen_label('monika_playersface') and not renpy.seen_label('submods_dathorse_facedetection_override_monika_playersface')",
+                    action=EV_ACT_QUEUE,
+                    aff_range=(mas_aff.NORMAL, None),
+                    unlocked=True
+                )
+            )
 
-    addEvent(
-        Event(
-            persistent.event_database,
-            eventlabel="submods_dathorse_facedetection_override_monika_playersface",
-            category=["mod"],
-            prompt="Webcam",
-            conditional="if FDAR.canRecognize() and not renpy.seen_label('submods_dathorse_facedetection_firsttime') and not renpy.seen_label('monika_playersface') and not renpy.seen_label('submods_dathorse_facedetection_override_monika_playersface')",
-            action=EV_ACT_QUEUE,
-            aff_range=(mas_aff.NORMAL, None),
-            unlocked=True
+        addEvent(
+            Event(
+                persistent.event_database,
+                eventlabel="submods_dathorse_facedetection_anytime",
+                category=["mod"],
+                prompt="How do I look?",
+                unlocked=True,
+                aff_range=(mas_aff.NORMAL, None)
+            )
         )
-    )
-
-    addEvent(
-        Event(
-            persistent.event_database,
-            eventlabel="submods_dathorse_facedetection_anytime",
-            category=["mod"],
-            prompt="How do I look?",
-            unlocked=True,
-            aff_range=(mas_aff.NORMAL, None)
-        )
-    )
-
-    mas_override_label("monika_playersface", "submods_dathorse_facedetection_override_monika_playersface")
+        mas_override_label("monika_playersface", "submods_dathorse_facedetection_override_monika_playersface")
 
 # Hijacking the original face topic..
 label submods_dathorse_facedetection_override_monika_playersface:
