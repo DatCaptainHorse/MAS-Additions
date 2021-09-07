@@ -18,8 +18,8 @@ init 5 python:
             prompt="Webcam",
             conditional="if FDAR.canRecognize() and not renpy.seen_label('submods_dathorse_facedetection_firsttime') and not renpy.seen_label('monika_playersface') and not renpy.seen_label('submods_dathorse_facedetection_override_monika_playersface')",
             action=EV_ACT_QUEUE,
-            aff_range=(mas_aff.NORMAL, None),
-            unlocked=True
+            unlocked=True,
+            aff_range=(mas_aff.NORMAL, None)
         )
     )
 
