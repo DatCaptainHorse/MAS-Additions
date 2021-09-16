@@ -16,16 +16,9 @@ init 5 python:
             eventlabel="submods_dathorse_facedetection_override_monika_playersface",
             category=["mod"],
             prompt="Webcam",
-<<<<<<< HEAD
             conditional="if FDAR.canRecognize() and not renpy.seen_label('submods_dathorse_facedetection_firsttime')",
             action=EV_ACT_QUEUE,
             aff_range=(mas_aff.NORMAL, None)
-=======
-            conditional="if FDAR.canRecognize() and not renpy.seen_label('submods_dathorse_facedetection_firsttime') and not renpy.seen_label('monika_playersface') and not renpy.seen_label('submods_dathorse_facedetection_override_monika_playersface')",
-            action=EV_ACT_QUEUE,
-            aff_range=(mas_aff.NORMAL, None),
-            unlocked=True
->>>>>>> parent of f00305f (Fixed an issue with not booting using current ver.)
         )
     )
 
