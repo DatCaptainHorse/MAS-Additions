@@ -1,0 +1,3 @@
+[submodule "Submodules/Automate-VCPKG"]
+	path = Submodules/Automate-VCPKG
+	url = https://github.com/REGoth-project/Automate-VCPKG.git

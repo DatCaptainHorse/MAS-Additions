@@ -1,0 +1,4 @@
+.vs/
+build/
+vcpkg/
+CMakeSettings.json
