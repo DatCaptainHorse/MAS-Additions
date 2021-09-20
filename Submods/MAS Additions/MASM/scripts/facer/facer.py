@@ -97,9 +97,9 @@ class Facer:
 				break
 
 			if count > 0:
-				print (f"Taking frame: {completed + 1}/{count}", end="\r")
+				print(f"Taking frame: {completed + 1}/{count}", end="\r")
 			else:
-				print (f"Taking frame: {completed + 1}", end="\r")
+				print(f"Taking frame: {completed + 1}", end="\r")
 
 			try:
 				frame = Facer.camFrame(minLightLevel)

@@ -62,32 +62,32 @@ def facePrepare(retake = False, overrideTimeout = 0):
 			chosenTimeout = overrideTimeout
 		try:
 			if not keepWebcamOpen and not Facer.camOn():
-				SE.Log("Camera failed to open")
+				print("Camera failed to open")
 				if not Facer.camOff():
-					SE.Log("Camera failed to close?")
+					print("Camera failed to close?")
 				return False
 			takeDNN = False
 			if detcMethod == 1 or detcMethod == 2:
 				takeDNN = True
 			if not Facer.take_faces("Player", count = 0, timeout = chosenTimeout, recreate = retake, useDNN = takeDNN, minLightLevel = 15):
 				if not keepWebcamOpen and not Facer.camOff():
-					SE.Log("Camera failed to close?")
+					print("Camera failed to close?")
 				return False
 			if not keepWebcamOpen and not Facer.camOff():
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 		except Facer.LightLevelLow:
 			if not keepWebcamOpen and not Facer.camOff():
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 			raise
 		except Facer.NoFacesFound:
-			SE.Log(f"Face couldn't be found within {chosenTimeout*2}s")
+			print(f"Face couldn't be found within {chosenTimeout*2}s")
 			if not keepWebcamOpen and not Facer.camOff():
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 			return False
 		except Exception as e:
-			SE.Log(f"Exception on taking data: {e}")
+			print(f"Exception on taking data: {e}")
 			if not keepWebcamOpen and not Facer.camOff():
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 			return False
 
 		try:
@@ -95,13 +95,13 @@ def facePrepare(retake = False, overrideTimeout = 0):
 				MASM.sendData("FDAR_FAILURE")
 				return False
 		except Exception as e:
-			SE.Log(f"Exception on train: {e}")
+			print(f"Exception on train: {e}")
 			MASM.sendData("FDAR_FAILURE")
 
 		try:
 			Facer.save_trained_lbph(str(pLBPHPath), str(pNamePath))
 		except Exception as e:
-			SE.Log(f"Exception on save: {e}")
+			print(f"Exception on save: {e}")
 			MASM.sendData("FDAR_FAILURE")
 
 		preparedYet = True
@@ -122,7 +122,7 @@ def recognizeKnown():
 	global preparedYet
 	global methodSwitch
 	if not preparedYet:
-		SE.Log("Tried to recognize before data is prepared")
+		print("Tried to recognize before data is prepared")
 		raise DataNotPrepared
 	else:
 		try:
@@ -131,7 +131,7 @@ def recognizeKnown():
 		except Facer.LightLevelLow:
 			raise
 		except Exception as e:
-			SE.Log(f"Capture frame exception: {e}")
+			print(f"Capture frame exception: {e}")
 			MASM.sendData("FDAR_FAILURE")
 			return None
 		else:
@@ -144,7 +144,7 @@ def recognizeKnown():
 					methodSwitch = not methodSwitch
 				found, people = Facer.recognize_faces_lbph(frame, threshold, methodSwitch)
 			except Exception as e:
-				SE.Log(f"LBPH recognizing exception: {e}")
+				print(f"LBPH recognizing exception: {e}")
 				#MASM.sendData("FDAR_FAILURE") # Disabled cuz hitting Python's nerve or something causing exception with random number, randomly. Works despite that
 				return None
 			else:
@@ -152,19 +152,19 @@ def recognizeKnown():
 					knownFound = []
 					for person in people:
 						if person[0] is None:
-							#SE.Log("Found someone")
+							#print("Found someone")
 							#knownFound.append("FDAR_SOMEONE")
 							# raise the threshold slowly to recognize person eventually
 							if threshold < 0.8:
 								threshold += 0.05
 						else:
-							SE.Log(f"Found {person[0]}")
+							print(f"Found {person[0]}")
 							knownFound.append(person[0])
 							if threshold > 0.6: # Keep threshold somewhere around where person can be detected
 								threshold -= 0.06
 					return knownFound
 				else:
-					SE.Log("Found nobody")
+					print("Found nobody")
 					return None
 	MASM.sendData("FDAR_FAILURE")
 	return None
@@ -177,18 +177,18 @@ def _recognizeLoop():
 	global failTimeout
 	global keepWebcamOpen
 	if not preparedYet:
-		SE.Log("Not prepared yet")
+		print("Not prepared yet")
 		try:
 			if not facePrepare():
-				SE.Log("Failed to prepare data")
+				print("Failed to prepare data")
 				MASM.sendData("FDAR_FAILURE")
 			else:
 				MASM.sendData("FDAR_MEMORIZE_DONE")
 		except Facer.LightLevelLow:
-			SE.Log("Low-light on prepare")
+			print("Low-light on prepare")
 			MASM.sendData("FDAR_MEMORIZE_LOWLIGHT")
 		except Exception as e:
-			SE.Log(f"Exception when preparing: {e}")
+			print(f"Exception when preparing: {e}")
 			MASM.sendData("FDAR_FAILURE")
 			return
 			
@@ -201,29 +201,29 @@ def _recognizeLoop():
 				if removeOld:
 					preparedYet = False
 				if not facePrepare(retake = removeOld, overrideTimeout = override):
-					SE.Log("Failed to memorize")
+					print("Failed to memorize")
 					MASM.sendData("FDAR_FAILURE")
 				else:
 					MASM.sendData("FDAR_MEMORIZE_DONE")
 			except Facer.LightLevelLow:
-				SE.Log("Low-light on memorize")
+				print("Low-light on memorize")
 				MASM.sendData("FDAR_MEMORIZE_LOWLIGHT")
 			except Exception as e:
-				SE.Log(f"Exception on memorize: {e}")
+				print(f"Exception on memorize: {e}")
 				MASM.sendData("FDAR_FAILURE")
 		
 		shouldRecognize = False
 		toRecognize = MASM.hasDataValue("FDAR_RECOGNIZEONCE")
 		if toRecognize is not None and lastAccess:
 			if not preparedYet:
-				SE.Log("Memory not prepared for recognition")
+				print("Memory not prepared for recognition")
 				MASM.sendData("FDAR_NOTMEMORIZED")
 			else:
 				shouldRecognize = True
 
 		if shouldRecognize:
 			if not keepWebcamOpen and not Facer.camOn():
-				SE.Log("Camera failed to open")
+				print("Camera failed to open")
 				MASM.sendData("FDAR_FAILURE")
 				shouldRecognize = False
 			else:
@@ -236,13 +236,13 @@ def _recognizeLoop():
 						try:
 							res = recognizeKnown()
 						except Facer.LightLevelLow:
-							SE.Log("Low-light on recognize")
+							print("Low-light on recognize")
 							MASM.sendData("FDAR_LOWLIGHT") # No breaking here so we can fail eventually as we want to keep trying
 						except DataNotPrepared:
 							shouldRecognize = False
 							break # We don't want to deal with this here.. Trust me I tried
 						except Exception as e:
-							SE.Log(f"Recognizing known exception: {e}")
+							print(f"Recognizing known exception: {e}")
 							MASM.sendData("FDAR_FAILURE")
 							shouldRecognize = False
 							break
@@ -258,7 +258,7 @@ def _recognizeLoop():
 						time.sleep(0.1)
 
 				if not keepWebcamOpen and not Facer.camOff():
-					SE.Log("Camera failed to close?")
+					print("Camera failed to close?")
 
 				if MASM.hasDataBool("FDAR_RECOGNIZESTOP"):
 					pass # Clear this so next recognitions won't fail immediately if duplicate data is received
@@ -279,10 +279,10 @@ def Update():
 	if newKeepOpen is not None:
 		if lastAccess:
 			if keepWebcamOpen and not newKeepOpen and not Facer.camOff():
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 			elif not keepWebcamOpen and newKeepOpen:
 				if not Facer.camOn():
-					SE.Log("Camera failed to open")
+					print("Camera failed to open")
 					MASM.sendData("FDAR_FAILURE")
 				else:
 					Facer.camFrame() # Turn on light
@@ -310,9 +310,9 @@ def Update():
 	allowAccess = MASM.hasDataValue("FDAR_ALLOWACCESS")
 	if allowAccess is True and allowAccess != lastAccess:
 		try:
-			SE.Log("Recognition allowed")
+			print("Recognition allowed")
 			if keepWebcamOpen and not Facer.camOn():
-				SE.Log("Camera failed to open")
+				print("Camera failed to open")
 			else:
 				if keepWebcamOpen:
 					Facer.camFrame() # Turn on light with empty read
@@ -322,24 +322,24 @@ def Update():
 				detcThread.start()
 				lastAccess = allowAccess
 		except Exception as e:
-			SE.Log(f"Exception to start recognition thread: {e}")
+			print(f"Exception to start recognition thread: {e}")
 			if not Facer.camOff(): # Just in case
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 	elif allowAccess is False and allowAccess != lastAccess:
 		try:
-			SE.Log("Recognition not allowed")
+			print("Recognition not allowed")
 			detcRun.set()
 			if detcThread is not None:
 				detcThread.join()
 				detcThread = None
 			if not Facer.camOff():
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 			lastAccess = allowAccess
 			preparedYet = False # So we can re-check for data existence
 		except Exception as e:
-			SE.Log(f"Exception to stop recognition thread: {e}")
+			print(f"Exception to stop recognition thread: {e}")
 			if not Facer.camOff(): # Just in case as well
-				SE.Log("Camera failed to close?")
+				print("Camera failed to close?")
 
 def Start():
 	global masmPath

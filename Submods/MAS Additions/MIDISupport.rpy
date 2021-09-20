@@ -110,7 +110,7 @@ init 811 python:
             return super(PianoDisplayableOverride, self).render(ev, x, y, st)
 
     v_list = config.version.split("-")[0].split(".") # *yoink* Thanks Mlem laf :)
-    if int(v_list[1]) == 12 and int(v_list[2]) <= 2:
+    if v_list == ["0", "12", "3"]:
         mas_override_label("mas_piano_start", "submods_dathorse_MIDI_override_piano_start")
         mas_override_label("mas_piano_loopstart", "submods_dathorse_MIDI_override_piano_loopstart")
         mas_override_label("mas_piano_songchoice", "submods_dathorse_MIDI_override_piano_songchoice")
@@ -142,17 +142,15 @@ label submods_dathorse_MIDI_override_piano_songchoice:
                 $ pnml = _return
                 if pnml:
                     m 1hua "I'm so excited to hear you play, [player]!"
-                    #if pnml.launch_label:
-                        #call expression pnml.launch_label from _zzpk_ssll
                     $ play_mode = PianoDisplayable.MODE_SONG
-                    jump mas_piano_setupstart
+                    jump submods_dathorse_MIDI_override_piano_setupstart
                 else:
-                    jump mas_piano_songchoice
+                    jump submods_dathorse_MIDI_override_piano_songchoice
 
             "On my own.":
                 pass
             "Nevermind.":
-                jump mas_piano_loopend
+                jump submods_dathorse_MIDI_override_piano_loopend
     m 1eua "Then play for me, [player]~"
 
 label submods_dathorse_MIDI_override_piano_setupstart:
@@ -161,26 +159,29 @@ label submods_dathorse_MIDI_override_piano_setupstart:
         disable_esc()
         mas_MUMURaiseShield()
     stop music
+    
     $ piano_displayable_obj = PianoDisplayableOverride(play_mode, pnml=pnml)
     $ ui.add(piano_displayable_obj)
     $ full_combo,is_win,is_practice,post_piano = ui.interact()
+    $ ui.remove(piano_displayable_obj)
     $ del piano_displayable_obj
+    
     $ mas_MUMUDropShield()
     $ enable_esc()
     $ mas_startup_song()
     $ pnmlSaveTuples()
+
     show monika 1hua at t11
     if full_combo and not persistent._mas_ever_won['piano']:
         $ persistent._mas_ever_won['piano'] = True
 
-    #call expression post_piano from _zzpk_ppel
     if post_piano != "mas_piano_result_none":
         m 1eua "Would you like to play again?{nw}"
         $ _history_list.pop()
         menu:
             m "Would you like to play again?{fast}"
             "Yes.":
-                jump mas_piano_loopstart
+                jump submods_dathorse_MIDI_override_piano_loopstart
             "No.":
                 pass
 

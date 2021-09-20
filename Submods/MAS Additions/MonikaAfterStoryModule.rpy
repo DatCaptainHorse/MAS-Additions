@@ -80,7 +80,7 @@ init -991 python:
                         sInfo = None
                         if renpy.windows: # Hide external cmd popup in Windows
                             sInfo = subprocess.STARTUPINFO()
-                            sInfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        #    sInfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                         MASM.subProc = subprocess.Popen(MASM.path, startupinfo=sInfo)
                         MASM.status = "Subprocess was created"
                     except:
@@ -291,6 +291,19 @@ screen MASM_settings_pane():
         text "MASM Path: [strPath]"
         
         hbox:
+            style_prefix "generic_fancy_check"
+            if _tooltip:
+                textbutton _("Manually open MASM"):
+                    action Function(MASM._switchManualOpen)
+                    selected persistent.submods_dathorse_MASM_manual
+                    hovered SetField(_tooltip, "value", "If you have issues with MASM not opening, toggle this on and open it up manually.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Manually open MASM"):
+                    action Function(MASM._switchManualOpen)
+                    selected persistent.submods_dathorse_MASM_manual
+        
+        hbox:
             if _tooltip:
                 textbutton _("Test Packet"):
                     action Function(MASM._ping)
@@ -308,12 +321,3 @@ screen MASM_settings_pane():
             else:
                 textbutton _("Restart MASM"):
                     action Function(MASM._startFull)
-
-            if _tooltip:
-                textbutton _("Manually open MASM: {}".format(persistent.submods_dathorse_MASM_manual)):
-                    action Function(MASM._switchManualOpen)
-                    hovered SetField(_tooltip, "value", "If you have issues with MASM not opening, toggle this on and open it up manually.")
-                    unhovered SetField(_tooltip, "value", _tooltip.default)
-            else:
-                textbutton _("Manually open MASM: {}".format(persistent.submods_dathorse_MASM_manual)):
-                    action Function(MASM._switchManualOpen)

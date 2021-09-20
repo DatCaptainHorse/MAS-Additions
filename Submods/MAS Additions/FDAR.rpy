@@ -415,24 +415,32 @@ screen FDAR_settings_pane():
 
         text "FDAR Status: [statusStr]"
 
-        if _tooltip:
-            textbutton _("Allow webcam access: {}".format(persistent.submods_dathorse_FDAR_allowAccess)):
-                action Function(FDAR._switchAllowAccess)
-                hovered SetField(_tooltip, "value", "Toggle whether to allow access to your webcam.")
-                unhovered SetField(_tooltip, "value", _tooltip.default)
-        else:
-            textbutton _("Allow webcam access: {}".format(persistent.submods_dathorse_FDAR_allowAccess)):
-                action Function(FDAR._switchAllowAccess)
+        hbox:
+            style_prefix "generic_fancy_check"
+            if _tooltip:
+                textbutton _("Allow webcam access"):
+                    action Function(FDAR._switchAllowAccess)
+                    selected persistent.submods_dathorse_FDAR_allowAccess
+                    hovered SetField(_tooltip, "value", "Toggle whether to allow access to your webcam.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Allow webcam access"):
+                    action Function(FDAR._switchAllowAccess)
+                    selected persistent.submods_dathorse_FDAR_allowAccess
 
-        if _tooltip:
-            textbutton _("Keep webcam open: {}".format(persistent.submods_dathorse_FDAR_keepOpen)):
-                action Function(FDAR._switchKeepOpen)
-                hovered SetField(_tooltip, "value", "Toggle whether webcam should stay open even if recognition is not happening. Keep this on if your webcam opens slowly.")
-                unhovered SetField(_tooltip, "value", _tooltip.default)
-        else:
-            textbutton _("Keep webcam open: {}".format(persistent.submods_dathorse_FDAR_keepOpen)):
-                action Function(FDAR._switchKeepOpen)
-                
+        hbox:
+            style_prefix "generic_fancy_check"
+            if _tooltip:
+                textbutton _("Keep webcam open"):
+                    action Function(FDAR._switchKeepOpen)
+                    selected persistent.submods_dathorse_FDAR_keepOpen
+                    hovered SetField(_tooltip, "value", "Toggle whether webcam should stay open even if recognition is not happening. Keep this on if your webcam opens slowly.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Keep webcam open"):
+                    action Function(FDAR._switchKeepOpen)
+                    selected persistent.submods_dathorse_FDAR_keepOpen
+                    
         if _tooltip:
             textbutton _("Recognition method: {}".format(detectStr)):
                 action Function(FDAR._switchDetectionMethod)
