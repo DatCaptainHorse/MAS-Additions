@@ -7,6 +7,8 @@
 # - New and updated topics
 # - Different responses, Monika can tell you to turn on the lights
 # - Painful amount of testing, I really hope stuff works..
+# 2.0.0 -> 2.0.1
+# - Fixes to topics, update script for persistent update
 
 default persistent.submods_dathorse_FDAR_date = None
 default persistent.submods_dathorse_FDAR_todayNotified = False # Don't keep notifying on alltime topic about doing it on same day
@@ -25,13 +27,23 @@ init -990 python:
             "Adds 2 topics by itself, 'Webcam' (1-time-only) and\n"
             "'How do I look?' which is visible after first topic in 'Mod' category.\n"
         ),
-        version="2.0.0",
+        version="2.0.1",
         dependencies={
             "Monika After Story Module" : (None, None)
         },
         settings_pane="FDAR_settings_pane",
-        version_updates={}
+        version_updates={
+            "submods_dathorse_FDAR_v2_0_0": "submods_dathorse_FDAR_v2_0_1"
+        }
     )
+
+label submods_dathorse_FDAR_v2_0_0(version="v2_0_0"):
+    return
+
+label submods_dathorse_FDAR_v2_0_1(version="v2_0_1"):
+    $ mas_stripEVL("submods_dathorse_facedetection_override_monika_playersface", list_pop = True)
+    $ mas_stripEVL("submods_dathorse_facedetection_anytime", list_pop = True)
+    return
 
 init -990 python:
     import time
