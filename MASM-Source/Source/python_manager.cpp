@@ -1,7 +1,5 @@
 #include <python_manager.h>
 
-#include <iostream>
-
 #include <Python.h>
 #include <spdlog/spdlog.h>
 

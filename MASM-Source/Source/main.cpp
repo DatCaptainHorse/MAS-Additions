@@ -1,8 +1,8 @@
 // Diet-coke MASM that had Singularity Engine ripped out of it
 
-#include <vector>
-#include <csignal>
 #include <filesystem>
+#include <csignal>
+#include <vector>
 #include <thread>
 #include <memory>
 
