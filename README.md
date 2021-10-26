@@ -4,6 +4,8 @@ Additions for Monika After Story mod for DDLC
 
 https://github.com/Monika-After-Story/MonikaModDev
 
+### ⚠️ This project needs help in staying updated and working ⚠️
+Brain won't give me serotonin :(
 
 ## Additions
 * MASM. MAS Module is an external program which enables the use of Python 3. Audio and Graphics features have been disabled for now. Required by other additions below.
