@@ -3,13 +3,14 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 namespace MASM {
 
 	// Splits filepath to tuple of parent path and filename with extension
-	std::tuple<std::string, std::string> string_split_path_file(const std::string& s)
+	std::tuple<std::string, std::string>
+	string_split_path_file(const std::string& s)
 	{
 		size_t found = s.find_last_of("/\\");
 		return { s.substr(0, found), s.substr(found + 1) };
@@ -27,4 +28,4 @@ namespace MASM {
 
 		return elems;
 	}
-}
+} // namespace MASM

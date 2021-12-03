@@ -13,7 +13,8 @@ namespace MASM {
 	{
 	private:
 		PyObject* m_Module = nullptr;
-		PyObject* m_FuncStart = nullptr, *m_FuncUpdate = nullptr, *m_FuncQuit = nullptr;
+		PyObject *m_FuncStart = nullptr, *m_FuncUpdate = nullptr,
+				 *m_FuncQuit = nullptr;
 
 	public:
 		inline PythonScript(const std::string& file)
@@ -27,7 +28,8 @@ namespace MASM {
 				return;
 			}
 
-			m_Module = PyImport_ImportModule(split[0].c_str()); // Import the Python module (script)
+			m_Module = PyImport_ImportModule(
+				split[0].c_str()); // Import the Python module (script)
 
 			if (m_Module == nullptr)
 				PyErr_Print();
@@ -64,4 +66,4 @@ namespace MASM {
 				PyObject_CallObject(m_FuncQuit, nullptr);
 		}
 	};
-}
+} // namespace MASM
