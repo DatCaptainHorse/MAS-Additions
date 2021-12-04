@@ -22,7 +22,7 @@ namespace MASM {
 			auto [filepath, filename] = string_split_path_file(file);
 
 			// Check if file has valid extension
-			auto split = string_split(filename, '.');
+			const auto split = string_split(filename, '.');
 			if (split.back() != "py") {
 				spdlog::error("Invalid filename : {}", filename);
 				return;

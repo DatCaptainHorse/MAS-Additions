@@ -12,7 +12,7 @@ namespace MASM {
 	std::tuple<std::string, std::string>
 	string_split_path_file(const std::string& s)
 	{
-		size_t found = s.find_last_of("/\\");
+		const size_t found = s.find_last_of("/\\");
 		return { s.substr(0, found), s.substr(found + 1) };
 	}
 

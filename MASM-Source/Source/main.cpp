@@ -45,7 +45,7 @@ BOOL WINAPI windowsConsoleHandler(const DWORD signal)
 int main(int argc, char** argv)
 {
 #ifdef _WIN32
-	auto console = GetStdHandle(STD_INPUT_HANDLE);
+	const auto console = GetStdHandle(STD_INPUT_HANDLE);
 	SetConsoleMode(console, ENABLE_EXTENDED_FLAGS);
 	SetConsoleCtrlHandler(windowsConsoleHandler, true);
 	signal(SIGINT, &signal_close);
@@ -70,7 +70,7 @@ int main(int argc, char** argv)
 
 	spdlog::set_pattern("[%^%l%$] %v");
 
-	auto masmPath = std::filesystem::path(argv[0]).parent_path();
+	const auto masmPath = std::filesystem::path(argv[0]).parent_path();
 	spdlog::info("MASM path: {}", masmPath.string());
 
 	if (!PythonManager::Init(masmPath)) {
@@ -95,10 +95,9 @@ int main(int argc, char** argv)
 	for (auto& script : loadedScripts)
 		script.callStart();
 
-	auto cycleTime = 0.0;
 	auto updateCycle = 0.0;
 	auto sleepTiming = std::chrono::steady_clock::now();
-	auto time = std::chrono::high_resolution_clock::now();
+	const auto time = std::chrono::high_resolution_clock::now();
 	auto oldTime =
 		std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
 			std::chrono::high_resolution_clock::now() - time)
@@ -107,12 +106,12 @@ int main(int argc, char** argv)
 	while (s_Close == 0) {
 		sleepTiming += std::chrono::microseconds(std::chrono::seconds(1)) / 100;
 
-		auto newTime =
+		const auto newTime =
 			std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
 				std::chrono::high_resolution_clock::now() - time)
 				.count() /
 			1000.0;
-		cycleTime = newTime - oldTime;
+		auto cycleTime = newTime - oldTime;
 		if (cycleTime > 0.25)
 			cycleTime = 0.25;
 

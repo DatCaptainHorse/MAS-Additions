@@ -21,7 +21,7 @@ project(
 
 # grab packages #
 vcpkg_install_packages(python3 spdlog)
-find_package(Python3 COMPONENTS Development REQUIRED)
+find_package(Python3 3.9 EXACT COMPONENTS Development REQUIRED)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR AWFUL_HACK_TO_BUILD_ON_BINS_SYSTEM)
   set(fmt_DIR "${VCPKG_ROOT}/installed/${VCPKG_TRIPLET}/share/fmt")
   set(spdlog_DIR "${VCPKG_ROOT}/installed/${VCPKG_TRIPLET}/share/spdlog")
