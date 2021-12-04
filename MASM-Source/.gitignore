@@ -1,4 +1,4 @@
 .vs/
-build/
+[Bb]uild*/
 vcpkg/
 CMakeSettings.json

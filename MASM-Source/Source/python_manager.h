@@ -4,7 +4,7 @@
 
 namespace MASM {
 
-	class PythonManager 
+	class PythonManager
 	{
 	private:
 		static bool m_Init;
@@ -13,4 +13,4 @@ namespace MASM {
 		static bool Init(std::filesystem::path path);
 		static void Clean();
 	};
-}
+} // namespace MASM

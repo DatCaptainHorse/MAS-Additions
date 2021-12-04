@@ -15,7 +15,7 @@ namespace MASM {
 		spdlog::info("Initializing Python");
 
 		PyStatus status;
-		
+
 		PyPreConfig preConf;
 		PyPreConfig_InitIsolatedConfig(&preConf);
 		preConf.utf8_mode = 1;
@@ -35,19 +35,26 @@ namespace MASM {
 			spdlog::error("Could not locate embedded python directory");
 			return false;
 		}
-		
-		spdlog::info("Embedded Python path: {}", embeddedPath.string());
-		status = PyConfig_SetString(&config, &config.home, embeddedPath.wstring().c_str());
-		status = PyWideStringList_Append(&config.module_search_paths, embeddedPath.wstring().c_str());
-		status = PyWideStringList_Append(&config.module_search_paths, (embeddedPath / "Lib").wstring().c_str());
-		status = PyWideStringList_Append(&config.module_search_paths, (embeddedPath / "DLLs").wstring().c_str());
-		status = PyWideStringList_Append(&config.module_search_paths, path.wstring().c_str());
-		status = PyWideStringList_Append(&config.module_search_paths, (path / "scripts").wstring().c_str());
-		status = PyWideStringList_Append(&config.module_search_paths, (path / "python-packages").wstring().c_str());
 
+		spdlog::info("Embedded Python path: {}", embeddedPath.string());
+		status =
+			PyConfig_SetString(&config, &config.home, embeddedPath.wstring().c_str());
+		status = PyWideStringList_Append(&config.module_search_paths,
+										 embeddedPath.wstring().c_str());
+		status = PyWideStringList_Append(&config.module_search_paths,
+										 (embeddedPath / "Lib").wstring().c_str());
+		status = PyWideStringList_Append(&config.module_search_paths,
+										 (embeddedPath / "DLLs").wstring().c_str());
+		status = PyWideStringList_Append(&config.module_search_paths,
+										 path.wstring().c_str());
+		status = PyWideStringList_Append(&config.module_search_paths,
+										 (path / "scripts").wstring().c_str());
+		status =
+			PyWideStringList_Append(&config.module_search_paths,
+									(path / "python-packages").wstring().c_str());
 
 		status = Py_InitializeFromConfig(&config);
-		
+
 		PyConfig_Clear(&config);
 
 		m_Init = true;
@@ -60,8 +67,9 @@ namespace MASM {
 		if (!m_Init)
 			return;
 
-		//Py_Finalize(); // Causes a freeze under linux, it's not needed according to documentation so.. good luck?
+		// Py_Finalize(); // Causes a freeze under linux, it's not needed according to
+		// documentation so.. good luck?
 
 		m_Init = false;
 	}
-}
+} // namespace MASM
