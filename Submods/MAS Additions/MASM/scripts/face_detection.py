@@ -13,10 +13,11 @@ pNamePath = None
 
 detcMethod = 0 # 0 HAAR, 1 DNN, 2 BOTH
 failTimeout = 10
-memoryTimeout = 3
+memoryTimeout = 5
 lastAccess = False
 preparedYet = False
 keepWebcamOpen = None
+chosenCam = 0
 
 detcThread = None
 detcRun = threading.Event()
@@ -267,6 +268,7 @@ def _recognizeLoop():
 
 def Update():
 	global detcRun
+	global chosenCam
 	global detcMethod
 	global lastAccess
 	global detcThread
@@ -274,9 +276,10 @@ def Update():
 	global failTimeout
 	global memoryTimeout
 	global keepWebcamOpen
+
 	# TODO: Recognize multiple people?
-	newKeepOpen = MASM.hasDataValue("FDAR_KEEPOPEN")
-	if newKeepOpen is not None:
+	if MASM.hasDataCheck("FDAR_KEEPOPEN", bool):
+		newKeepOpen = MASM.hasDataValue("FDAR_KEEPOPEN")
 		if lastAccess:
 			if keepWebcamOpen and not newKeepOpen and not Facer.camOff():
 				print("Camera failed to close?")
@@ -289,13 +292,13 @@ def Update():
 					MASM.sendData("FDAR_CAMON")
 		keepWebcamOpen = newKeepOpen
 
-	newTimeout = MASM.hasDataValue("FDAR_SETTIMEOUT")
-	if newTimeout and newTimeout > 0:
-		failTimeout = newTimeout
+	if MASM.hasDataCheck("FDAR_SETTIMEOUT", int):
+		if (newVal := MASM.hasDataValue("FDAR_SETTIMEOUT", 0)) > 0:
+			failTimeout = newVal
 
-	newMemoryTime = MASM.hasDataValue("FDAR_SETMEMORYTIMEOUT")
-	if newMemoryTime and newMemoryTime > 0:
-		memoryTimeout = newMemoryTime
+	if MASM.hasDataCheck("FDAR_SETMEMORYTIMEOUT", int):
+		if (newVal := MASM.hasDataValue("FDAR_SETMEMORYTIMEOUT", 0)) > 0:
+			memoryTimeout = newVal
 
 	method = MASM.hasDataValue("FDAR_DETECTIONMETHOD")
 	if method is not None:
@@ -305,6 +308,31 @@ def Update():
 			detcMethod = 1
 		elif method == "BOTH":
 			detcMethod = 2
+
+	if MASM.hasDataBool("FDAR_GETCAMS"):
+		if keepWebcamOpen:
+			Facer.camOff()
+		MASM.sendData("FDAR_CAMSLIST", Facer.getCams())
+		if keepWebcamOpen:
+			Facer.camOn()
+			Facer.camFrame()
+
+	if MASM.hasDataCheck("FDAR_SETCAM", int):
+		chosenCam = MASM.hasDataValue("FDAR_SETCAM", 0)
+
+	if MASM.hasDataBool("FDAR_TESTCAM"):
+		try:
+			if keepWebcamOpen:
+				Facer.camOff()
+				Facer.camOn(id = chosenCam)
+				Facer.camFrame()
+			else:
+				Facer.camOn(id = chosenCam)
+				Facer.camFrame()
+				time.sleep(3) # Yes, bad
+				Facer.camOff()
+		except Exception as e:
+			print(f"Error wat: {e}")
 
 	# Message tells whether we are allowed to recognize or not
 	allowAccess = MASM.hasDataValue("FDAR_ALLOWACCESS")

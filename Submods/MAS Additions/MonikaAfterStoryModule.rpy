@@ -207,11 +207,12 @@ init -991 python:
 
         # Returns data's value if found by string, None if failed
         @staticmethod
-        def hasDataValue(dictKey):
-            res = None
+        def hasDataValue(dictKey, defaultValue = None):
+            res = defaultValue
             with MASM.commLock:
-                res = MASM.data.get(dictKey, None)
-                if res is not None:
+                got = MASM.data.get(dictKey, None)
+                if got is not None:
+                    res = got
                     del MASM.data[dictKey]
             return res
 
@@ -221,7 +222,17 @@ init -991 python:
             res = False
             with MASM.commLock:
                 if dictKey in MASM.data:
-                    del MASM.data[dictKey] # keep dict tidy and garbage-collected
+                    res = True
+                    del MASM.data[dictKey]
+            return res
+
+        # Returns True if data exists, False otherwise. You can check for specific type by passing type to expectedType. Does not remove the data.
+        @staticmethod
+        def hasDataCheck(dictKey, expectedType = None):
+            res = False
+            with MASM.commLock:
+                val = MASM.data.get(dictKey, None)
+                if val is not None and (expectedType is None or type(val) is expectedType):
                     res = True
             return res
 

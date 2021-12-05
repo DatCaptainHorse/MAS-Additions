@@ -126,13 +126,13 @@ label submods_dathorse_facedetection_anytime_main:
             jump submods_dathorse_facedetection_anytime_main
         elif result == -3:
             m 1dsb "This will take a while longer...{nw}"
-            $ FDAR._memorizePlayer(removeOld = False, duringRecognize = True, overrideTimeout = 2) # Shorter fresh data added so it doesn't take too long
+            $ FDAR._memorizePlayer(removeOld = False, duringRecognize = True, overrideTimeout = 3) # Shorter fresh data added so it doesn't take too long
             jump submods_dathorse_facedetection_anytime_main
         elif result == 1:
             if mas_pastOneDay(persistent.submods_dathorse_FDAR_date): # Once per day, add some minor fresh data
                 m 1hsa "...{nw}"
-                $ FDAR._memorizePlayer(removeOld = False, duringRecognize = True, overrideTimeout = 2) # Same here
-                $ time.sleep(2) # Some sleep so memorization can finish
+                $ FDAR._memorizePlayer(removeOld = False, duringRecognize = True, overrideTimeout = 3) # Same here
+                $ time.sleep(3) # Some sleep so memorization can finish
                 m 1hsb "Ah! Sorry [player], I got lost looking into your eyes."
             else:
                 m 1hsb "I can see you [player]!"

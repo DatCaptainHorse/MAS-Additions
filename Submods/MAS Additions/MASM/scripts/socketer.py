@@ -1,9 +1,6 @@
 # Using sockets to transfer data between Ren'Py and MASM
 # TODO: Ping-Pong alive check messages
-import re
-import time
 import json
-import errno
 import socket
 import threading
 
@@ -30,12 +27,13 @@ class MASM:
 	def _connectMAS():
 		if MASM.serverSocket is None:
 			try:
-				print("Creating server socket..")
+				print("Creating server socket..", end=" ")
 				MASM.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 				MASM.serverSocket.settimeout(0.1)
 				MASM.serverSocket.bind(("127.0.0.1", 24489))
-				print("Done, sending ready message..")
-				MASM.serverSocket.sendto(json.dumps(("MASM_READY", True)).encode("utf-8"), ("127.0.0.1", 24488))
+				print("Done")
+				print("Sending ready message..", end=" ")
+				MASM.sendData("MASM_READY", True)
 				print("Done")
 			except Exception as e:
 				print(f"Creating socket exception: {e}")
@@ -79,11 +77,12 @@ class MASM:
 		return res
 
 	@staticmethod
-	def hasDataValue(dictKey):
-		res = None
+	def hasDataValue(dictKey, defaultValue = None):
+		res = defaultValue
 		with MASM.commLock:
-			res = MASM.data.get(dictKey, None)
-			if res is not None:
+			got = MASM.data.get(dictKey, None)
+			if got is not None:
+				res = got
 				del MASM.data[dictKey]
 		return res
 
@@ -94,6 +93,15 @@ class MASM:
 			if dictKey in MASM.data:
 				res = True
 				del MASM.data[dictKey]
+		return res
+
+	@staticmethod
+	def hasDataCheck(dictKey, expectedType = None):
+		res = False
+		with MASM.commLock:
+			val = MASM.data.get(dictKey, None)
+			if val is not None and (expectedType is None or type(val) is expectedType):
+				res = True
 		return res
 
 def Start():

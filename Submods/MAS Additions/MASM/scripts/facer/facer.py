@@ -5,7 +5,6 @@ import os
 import time
 import numpy as np
 import cv2
-import pathlib
 import pickle
 from sys import platform
 
@@ -19,10 +18,41 @@ class Facer:
 	realPath = os.path.dirname(os.path.realpath(__file__))
 	face_cascade = cv2.CascadeClassifier(realPath + '/' + "haarcascade_frontalface_default.xml")
 
+	# Returns list of cameras that are available and return frames
 	@staticmethod
-	def camOn():
+	def getCams():
+		if Facer.onCam is not None:
+			print("Cannot list cameras when one is in use")
+			return []
+
+		fails = 0
+		testPort = 0
+		working = []
+		max_fails_between = 2
+		is_working = True
+		while is_working:
+			cam = cv2.VideoCapture(testPort)
+			if cam.isOpened():
+				fails = 0
+				ret, frame = cam.read()
+				if ret and frame is not None:
+					print(f"Camera {testPort} available")
+					working.append(testPort)
+			else:
+				if fails >= max_fails_between:
+					is_working = False
+				else:
+					fails += 1
+				print(f"Camera {testPort} unavailable")
+			testPort +=1
+		return working
+
+	# Turns on camera
+	# Parameter id specifies the camera to open, available cameras can be gotten using getCams function
+	@staticmethod
+	def camOn(id = 0):
 		if Facer.onCam is None:
-			Facer.onCam = cv2.VideoCapture(0)
+			Facer.onCam = cv2.VideoCapture(id)
 			if platform != "win32": # Assume all UNIX OS'es need this
 				Facer.onCam.set(cv2.CAP_PROP_BUFFERSIZE, 5)
 
@@ -33,6 +63,7 @@ class Facer:
 
 		return True
 
+	# Turns off camera that is currently on
 	@staticmethod
 	def camOff():
 		if Facer.onCam is None:
@@ -71,8 +102,8 @@ class Facer:
 
 	@staticmethod
 	def camClearBuffer():
-		if platform != "win32": # Same here
-			for i in range(5): # Clear old frame
+		if platform != "win32": # Not required on windows
+			for i in range(5): # Clear last 5 old frames
 				Facer.onCam.grab()
 
 	# Takes pictures with webcam, used for training, if count is 0 timeout is used as main count

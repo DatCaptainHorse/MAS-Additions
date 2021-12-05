@@ -11,12 +11,13 @@
 # - Fixes to topics, update script for persistent update
 
 default persistent.submods_dathorse_FDAR_date = None
+default persistent.submods_dathorse_FDAR_chosenCamera = 0
 default persistent.submods_dathorse_FDAR_todayNotified = False # Don't keep notifying on alltime topic about doing it on same day
 default persistent.submods_dathorse_FDAR_allowAccess = False
 default persistent.submods_dathorse_FDAR_keepOpen = True # Whether to keep webcam open or only open it for recognition
 default persistent.submods_dathorse_FDAR_detectionMethod = "HAAR" # Default to HAAR for faster recognition
 default persistent.submods_dathorse_FDAR_detectionTimeout = 10 # 10 seconds should be good enough, user can adjust if needed
-default persistent.submods_dathorse_FDAR_memoryTimeout = 3 # 3 seconds of larger data, starting at 60MB (math goes: 100MB * timeout / 5)
+default persistent.submods_dathorse_FDAR_memoryTimeout = 5 # 5 seconds of larger data, starting at 100MB (math goes: 100MB * timeout / 5)
 
 init -990 python:
     store.mas_submod_utils.Submod(
@@ -55,7 +56,8 @@ init -990 python:
         initPrepared = False
         statusThread = None
         statusThreadEvent = threading.Event()
-        stateMachine = { "NONE": False, "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False }
+        availableCameras = []
+        stateMachine = { "NONE": False, "RECOGNIZING": False, "PREPARING": False, "MEMORIZING": False, "UPDATING_CAMS": False }
 
         # Set current stateMachine state
         # This is for internal use.
@@ -89,10 +91,14 @@ init -990 python:
             coolDots = "."
             lastTime = time.time()
             startTime = time.time()
-            prepareTimeout = 10
+            loopTimeout = 10
             if not persistent.submods_dathorse_FDAR_keepOpen or not FDAR.initPrepared:
-                prepareTimeout *= 2 # Some extra time, if your webcam takes longer than this to open I'm sorry you have to deal with that.
-            while not FDAR.statusThreadEvent.is_set() and MASM.isWorking() and FDAR._getState("PREPARING"):
+                loopTimeout *= 2 # Some extra time, hoping some webcam doesn't take longer than this to open. TODO: Calculate webcam opening time.
+
+            if FDAR._getState("UPDATING_CAMS"):
+                loopTimeout *= 6 # Multiple slow cameras can really slow things down..
+
+            while not FDAR.statusThreadEvent.is_set() and MASM.isWorking() and not FDAR._getState("NONE"):
                 if MASM.hasDataBool("FDAR_FAILURE"):
                     FDAR._setState("NONE")
                     FDAR.status = "Preparation failed"
@@ -111,7 +117,7 @@ init -990 python:
                 elif MASM.hasDataBool("FDAR_MEMORIZE_DONE"):
                     if not FDAR.initPrepared:
                         FDAR.initPrepared = True
-                        MASM.sendData("FDAR_MEMORIZE", (False, 1)) # Manually doing this here # TODO: Need somehow to keep cam on so it doens't need to reopen
+                        MASM.sendData("FDAR_MEMORIZE", (False, 3)) # Manually doing this here # TODO: Need somehow to keep cam on so it doesn't need to reopen # TODO: problem anymore?
                     else:
                         FDAR._setState("NONE")
                         FDAR.status = "Prepared, ready!"
@@ -119,6 +125,11 @@ init -990 python:
                 elif MASM.hasDataBool("FDAR_NOPREPAREDATA"):
                     if not FDAR.initPrepared: # Don't update data immediately if we are already taking initial one
                         FDAR.initPrepared = True
+                elif MASM.hasDataCheck("FDAR_CAMSLIST"):
+                    FDAR.availableCameras = MASM.hasDataValue("FDAR_CAMSLIST")
+                    FDAR.status = "Available cameras: {}".format(FDAR.availableCameras)
+                    renpy.restart_interaction()
+                    FDAR._setState("NONE")
                 elif time.time() - lastTime > 1.0:
                     FDAR.status = "Please wait{}".format(coolDots)
                     renpy.restart_interaction()
@@ -127,7 +138,7 @@ init -990 python:
                     else:
                         coolDots = "."
                     lastTime = time.time()
-                elif time.time() - startTime >= prepareTimeout: # Assume something failed on timeout
+                elif time.time() - startTime >= loopTimeout: # Assume something failed on timeout
                     FDAR._setState("NONE")
                     FDAR.status = "Timed out"
                     renpy.restart_interaction()
@@ -157,7 +168,10 @@ init -990 python:
             FDAR.status = None
             FDAR.initPrepared = False
             FDAR._setState("NONE")
+            FDAR.availableCameras = []
+            FDAR.availableCameras.append(persistent.submods_dathorse_FDAR_chosenCamera)
             # Apply persistents
+            FDAR._setCamera(persistent.submods_dathorse_FDAR_chosenCamera)
             FDAR._setKeepOpen(persistent.submods_dathorse_FDAR_keepOpen)
             FDAR._setTimeout(persistent.submods_dathorse_FDAR_detectionTimeout)
             FDAR._setMemoryTimeout(persistent.submods_dathorse_FDAR_memoryTimeout)
@@ -176,6 +190,36 @@ init -990 python:
         def _atExit():
             FDAR.statusThreadEvent.set()
             FDAR.statusThread.join()
+
+        # Updates FDAR.availableCameras with available, working camera indexes
+        @staticmethod
+        def _updateAvailableCameras():
+            if FDAR._getState("NONE") and MASM.isWorking():
+                FDAR._setState("UPDATING_CAMS")
+                MASM.sendData("FDAR_GETCAMS")
+                FDAR._startScreenUpdate()
+
+        # Changes current camera being used
+        @staticmethod
+        def _setCamera(camID):
+            if FDAR._getState("NONE") and MASM.isWorking():
+                MASM.sendData("FDAR_SETCAM", camID)
+
+        # Changes current camera being used
+        @staticmethod
+        def _switchCamera():
+            if FDAR._getState("NONE") and MASM.isWorking():
+                try:
+                    persistent.submods_dathorse_FDAR_chosenCamera = FDAR.availableCameras[(FDAR.availableCameras.index(persistent.submods_dathorse_FDAR_chosenCamera) + 1) % len(FDAR.availableCameras)]
+                except:
+                    persistent.submods_dathorse_FDAR_chosenCamera = FDAR.availableCameras[0] if len(FDAR.availableCameras) > 0 else 0
+                FDAR._setCamera(persistent.submods_dathorse_FDAR_chosenCamera)
+
+        # Tests chosen camera by turning it on and off
+        @staticmethod
+        def _testCamera():
+            if FDAR._getState("NONE") and MASM.isWorking():
+                MASM.sendData("FDAR_TESTCAM")
 
         # Request to memorize player
         # This is for internal use.
@@ -324,7 +368,7 @@ init -990 python:
         # Returns False if re-memorize is running, access is disabled or MASM is not working, True otherwise
         @staticmethod
         def canRecognize():
-            if not FDAR._getState("PREPARING") and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
+            if FDAR._getState("NONE") and persistent.submods_dathorse_FDAR_allowAccess and MASM.isWorking():
                 return True
             else:
                 return False
@@ -438,6 +482,7 @@ screen FDAR_settings_pane():
             doubleStr = ""
         else:
             doubleStr = " (doubled)"
+
     vbox:
         box_wrap False
         xfill True
@@ -445,11 +490,7 @@ screen FDAR_settings_pane():
         style_prefix "check"
 
         text "FDAR Status: [statusStr]"
-        text "FDAR State: {}".format(FDAR._getStateName())
-        #text "FDAR NONE: {}".format(FDAR._getState("NONE"))
-        #text "FDAR PREPARING: {}".format(FDAR._getState("PREPARING"))
-        #text "FDAR MEMORIZING: {}".format(FDAR._getState("MEMORIZING"))
-        #text "FDAR RECOGNIZING: {}".format(FDAR._getState("RECOGNIZING"))
+        text "FDAR State: {}".format(FDAR._getStateName()) # TODO: Debug fancy check
 
         hbox:
             style_prefix "generic_fancy_check"
@@ -463,6 +504,34 @@ screen FDAR_settings_pane():
                 textbutton _("Allow webcam access"):
                     action Function(FDAR._switchAllowAccess)
                     selected persistent.submods_dathorse_FDAR_allowAccess
+        
+        if _tooltip:
+            textbutton _("Refresh available webcams"):
+                action Function(FDAR._updateAvailableCameras)
+                hovered SetField(_tooltip, "value", "Gets working webcams for selection. Will take some time.")
+                unhovered SetField(_tooltip, "value", _tooltip.default)
+        else:
+            textbutton _("Refresh available webcams"):
+                action Function(FDAR._updateAvailableCameras)
+
+        hbox:
+            if _tooltip:
+                textbutton _("Chosen webcam: {}".format(persistent.submods_dathorse_FDAR_chosenCamera)):
+                    action Function(FDAR._switchCamera)
+                    hovered SetField(_tooltip, "value", "Currently chosen webcam, use the test button to check if it's the right one.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Chosen webcam: {}".format(persistent.submods_dathorse_FDAR_chosenCamera)):
+                    action Function(FDAR._switchCamera)
+
+            if _tooltip:
+                textbutton _("Test"):
+                    action Function(FDAR._testCamera)
+                    hovered SetField(_tooltip, "value", "Test if your chosen webcam is the correct one. When clicked check if webcam light turns on momentarily.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("Test"):
+                    action Function(FDAR._testCamera)
 
         hbox:
             style_prefix "generic_fancy_check"
@@ -501,7 +570,7 @@ screen FDAR_settings_pane():
             if _tooltip:
                 textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
                     action Function(FDAR._switchMemoryTimeout)
-                    hovered SetField(_tooltip, "value", "How long will Monika memorize you for initially, longer is better but\n uses more space (limited to 60MB at 3s - 200MB at 10s)")
+                    hovered SetField(_tooltip, "value", "How long will Monika memorize your look for, longer is better but\n uses more space (limited to 60MB at 3s - 200MB at 10s)")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
@@ -511,12 +580,12 @@ screen FDAR_settings_pane():
             if persistent.submods_dathorse_FDAR_allowAccess:
                 if _tooltip:
                     textbutton _("Update Memory"):
-                        action Function(FDAR._memorizePlayer, False, False, 1)
+                        action Function(FDAR._memorizePlayer, False, False, 3)
                         hovered SetField(_tooltip, "value", "Adds your current look to Monika's memory so she can see you easier.")
                         unhovered SetField(_tooltip, "value", _tooltip.default)
                 else:
                     textbutton _("Update Memory"):
-                        action Function(FDAR._memorizePlayer, False, False, 1)
+                        action Function(FDAR._memorizePlayer, False, False, 3)
 
                 if _tooltip:
                     textbutton _("Re-Memorize"):
