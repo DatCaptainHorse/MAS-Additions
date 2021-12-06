@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 # vcpkg automation setup #
+set(VCPKG_FEATURE_FLAGS versions)
 set(VCPKG_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg")
 set(ENV{VCPKG_OVERLAY_TRIPLETS} "${CMAKE_CURRENT_SOURCE_DIR}/Custom-Triplets/")
 include("Submodules/Automate-VCPKG/automate-vcpkg.cmake")
@@ -20,21 +21,25 @@ project(
 )
 
 # grab packages #
-vcpkg_install_packages(python3 spdlog)
-find_package(Python3 3.9 EXACT COMPONENTS Development REQUIRED)
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR AWFUL_HACK_TO_BUILD_ON_BINS_SYSTEM)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(fmt_DIR "${VCPKG_ROOT}/packages/fmt_x64-linux/share/fmt")
+  set(spdlog_DIR "${VCPKG_ROOT}/packages/spdlog_x64-linux/share/spdlog")
+elseif(AWFUL_HACK_TO_BUILD_ON_BINS_SYSTEM)
   set(fmt_DIR "${VCPKG_ROOT}/installed/${VCPKG_TRIPLET}/share/fmt")
   set(spdlog_DIR "${VCPKG_ROOT}/installed/${VCPKG_TRIPLET}/share/spdlog")
 endif()
+
+find_package(Python3 3.9 EXACT COMPONENTS Development REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 
 set(MASM_SOURCES
-"Source/main.cpp"
-"Source/utilities.h"
-"Source/pythonscript.h"
-"Source/python_manager.h"
-"Source/python_manager.cpp")
+  "Source/main.cpp"
+  "Source/utilities.h"
+  "Source/pythonscript.h"
+  "Source/python_manager.h"
+  "Source/python_manager.cpp"
+)
 
 add_executable(MASM ${MASM_SOURCES})
 
@@ -46,8 +51,8 @@ target_include_directories(MASM
 target_link_libraries(MASM
   PRIVATE
 	$<$<CXX_COMPILER_ID:GNU>:stdc++fs>
-  $<$<CXX_COMPILER_ID:GNU>:-Xlinker>
-  $<$<CXX_COMPILER_ID:GNU>:-export-dynamic>
+	$<$<CXX_COMPILER_ID:GNU>:-Xlinker>
+	$<$<CXX_COMPILER_ID:GNU>:-export-dynamic>
 	Python3::Python
 	spdlog::spdlog_header_only
 )
@@ -61,9 +66,6 @@ foreach(SOURCE_FILE ${MASM_SOURCES})
   list(APPEND TO_FORMAT ${PROJECT_SOURCE_DIR}/${SOURCE_FILE})
 endforeach()
 
-add_custom_target(
-  format
-  COMMAND clang-format
-  -i
-  ${TO_FORMAT}
+add_custom_target(format
+  COMMAND clang-format -i ${TO_FORMAT}
 )

@@ -1,0 +1,15 @@
+{
+    "name": "masm",
+    "version": "1.0.0",
+    "dependencies": [
+        {
+            "name": "python3",
+            "version>=": "3.9.7"
+        },
+        "spdlog"
+    ],
+    "builtin-baseline": "63e935d967a3410e26bf4a708efa39d8384d2bbb",
+    "overrides": [
+        { "name": "python3", "version": "3.9.7" }
+    ]
+}

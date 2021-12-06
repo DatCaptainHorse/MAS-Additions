@@ -1,0 +1,7 @@
+set(VCPKG_TARGET_ARCHITECTURE x64)
+set(VCPKG_CMAKE_SYSTEM_NAME Linux)
+if(${PORT} MATCHES "fmt|spdlog")
+	set(VCPKG_LIBRARY_LINKAGE static)
+else()
+	set(VCPKG_LIBRARY_LINKAGE dynamic)
+endif()
