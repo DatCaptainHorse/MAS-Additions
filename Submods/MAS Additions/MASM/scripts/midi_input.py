@@ -10,7 +10,7 @@ def Start():
 		inPort = mido.open_input()
 	except Exception as e:
 		inPort = None
-		SE.Log(f"Could not open MIDI input: {e}")
+		print(f"Could not open MIDI input: {e}")
 
 def Update():
 	global inPort

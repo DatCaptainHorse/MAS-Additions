@@ -52,7 +52,7 @@ init -991 python:
         status = None
         path = None
         data = {}
-        timing = 0.0
+        timing = []
         startTime = 0.0
         subProc = None
         commLock = None
@@ -157,16 +157,19 @@ init -991 python:
                     if recv is not None:
                         recv = json.loads(recv.decode("utf-8"))
                         if recv[0] == "pong":
-                            MASM.timing = (time.time() - MASM.startTime) * 1000.0
+                            MASM.timing.append((time.time() - MASM.startTime) * 1000.0)
+                            if len(MASM.timing) > 10:
+                                MASM.timing.pop(0)
                         if recv[0] == "MASM_READY":
                             MASM.status = "Ready!"
                             for atStart in MASM.atStartCalls:
                                 atStart()
-                            MASM.timing = (time.time() - MASM.startTime) * 1000.0
+                            MASM.timing = [ (time.time() - MASM.startTime) * 1000.0 ]
                         else:
                             with MASM.commLock:
                                 MASM.data[recv[0]] = recv[1]
                 except socket.timeout:
+                    time.sleep(0) # Yield thread
                     continue # No data received
                 except socket.error:
                     pass # Probably due to subprocess dying
@@ -185,11 +188,15 @@ init -991 python:
                 if MASM._startThreadMASM() and not persistent.submods_dathorse_MASM_manual:
                     MASM._openMASM()
 
+        # Sends multiple ping packets to measure average latency, for internal use
         @staticmethod
         def _ping():
             if MASM.isWorking() and MASM.serverConnection is not None:
-                MASM.startTime = time.time()
-                MASM.serverConnection.sendto(json.dumps(("ping", True)).encode("utf-8"), ("127.0.0.1", 24489))
+                MASM.timing = []
+                for i in range(10):
+                    MASM.startTime = time.time()
+                    MASM.serverConnection.sendto(json.dumps(("ping", True)).encode("utf-8"), ("127.0.0.1", 24489))
+                    time.sleep(0.1)
 
         # Finds data by starting string, like startswith() for data
         # Returns tuple of data string and value if succesful, tuple (None, None) otherwise
@@ -281,14 +288,14 @@ screen MASM_settings_pane():
         if MASM.subProc:
             subprocPID = MASM.subProc.pid
         else:
-            subprocPID = 0
+            subprocPID = "Not alive"
 
         if MASM.status:
             statusStr = MASM.status
         else:
             statusStr = "Not Ready"
 
-        strTiming = "{:.2f}".format(MASM.timing)
+        strTiming = "{:.0f}".format((sum(MASM.timing) / len(MASM.timing)) if len(MASM.timing) > 0 else 0)
         strPath = str(MASM.path)
     vbox:
         box_wrap False
@@ -297,7 +304,7 @@ screen MASM_settings_pane():
         style_prefix "check"
 
         text "MASM Status: [statusStr]"
-        text "MASM Startup/Ping time: [strTiming]ms"
+        text "MASM Startup time/Latency average: [strTiming]ms"
         text "MASM PID: [subprocPID]"
         text "MASM Path: [strPath]"
         
@@ -316,12 +323,12 @@ screen MASM_settings_pane():
         
         hbox:
             if _tooltip:
-                textbutton _("Test Packet"):
+                textbutton _("Ping"):
                     action Function(MASM._ping)
-                    hovered SetField(_tooltip, "value", "For debugging purposes, sends a ping packet.")
+                    hovered SetField(_tooltip, "value", "For debugging purposes, sends a ping packets to MASM to see if it responds properly.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
-                textbutton _("Test Packet"):
+                textbutton _("Ping"):
                     action Function(MASM._ping)
             
             if _tooltip:

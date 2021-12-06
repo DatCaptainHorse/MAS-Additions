@@ -527,7 +527,7 @@ screen FDAR_settings_pane():
             if _tooltip:
                 textbutton _("Test"):
                     action Function(FDAR._testCamera)
-                    hovered SetField(_tooltip, "value", "Test if your chosen webcam is the correct one. When clicked check if webcam light turns on momentarily.")
+                    hovered SetField(_tooltip, "value", "Test if your chosen webcam is the correct one.\nWhen clicked check if webcam light turns on momentarily.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Test"):
@@ -539,7 +539,7 @@ screen FDAR_settings_pane():
                 textbutton _("Keep webcam open"):
                     action Function(FDAR._switchKeepOpen)
                     selected persistent.submods_dathorse_FDAR_keepOpen
-                    hovered SetField(_tooltip, "value", "Toggle whether webcam should stay open even if recognition is not happening. Keep this on if your webcam opens slowly.")
+                    hovered SetField(_tooltip, "value", "Toggle whether webcam should stay open even if recognition is not happening.\nKeep this on if your webcam opens slowly.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Keep webcam open"):
@@ -561,7 +561,7 @@ screen FDAR_settings_pane():
             if _tooltip:
                 textbutton _("Recognize timeout: {}s{}".format(persistent.submods_dathorse_FDAR_detectionTimeout, doubleStr)):
                     action Function(FDAR._switchTimeout)
-                    hovered SetField(_tooltip, "value", "How long will Monika try to see you for before giving up. This is doubled if webcam isn't kept open.")
+                    hovered SetField(_tooltip, "value", "How long will Monika try to see you for before giving up.\nThis is doubled if webcam isn't kept open.")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Recognize timeout: {}s{}".format(persistent.submods_dathorse_FDAR_detectionTimeout, doubleStr)):
@@ -570,7 +570,7 @@ screen FDAR_settings_pane():
             if _tooltip:
                 textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
                     action Function(FDAR._switchMemoryTimeout)
-                    hovered SetField(_tooltip, "value", "How long will Monika memorize your look for, longer is better but\n uses more space (limited to 60MB at 3s - 200MB at 10s)")
+                    hovered SetField(_tooltip, "value", "How long will Monika memorize your look for, longer is better but\nuses more space (limited to 60MB at 3s - 200MB at 10s)")
                     unhovered SetField(_tooltip, "value", _tooltip.default)
             else:
                 textbutton _("Memorization stop after: {}s".format(persistent.submods_dathorse_FDAR_memoryTimeout)):
@@ -590,7 +590,7 @@ screen FDAR_settings_pane():
                 if _tooltip:
                     textbutton _("Re-Memorize"):
                         action Function(FDAR._memorizePlayer, True)
-                        hovered SetField(_tooltip, "value", "Complete re-memorization if you have issues with Monika seeing you no matter what.")
+                        hovered SetField(_tooltip, "value", "Complete re-memorization if you have issues with Monika not being able to see you.")
                         unhovered SetField(_tooltip, "value", _tooltip.default)
                 else:
                     textbutton _("Re-Memorize"):

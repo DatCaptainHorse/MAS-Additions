@@ -1,6 +1,7 @@
 # Using sockets to transfer data between Ren'Py and MASM
 # TODO: Ping-Pong alive check messages
 import json
+import time
 import socket
 import threading
 
@@ -52,6 +53,7 @@ class MASM:
 						with MASM.commLock:
 							MASM.data[recv[0]] = recv[1]
 			except socket.timeout:
+				time.sleep(0) # Yield thread
 				continue # No data
 			except socket.error as e:
 				print(f"Socket receive error: {e}") # Log but pass

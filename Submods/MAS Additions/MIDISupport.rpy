@@ -99,7 +99,7 @@ init 811 python:
                         elif self.state in self.MATCH_STATES:
                             self.stateMatch(pygame.KEYDOWN, k)
 
-                        renpy.music.set_volume(vel/127.0, channel="audio") # I was actually surprised this works on per-audio basis
+                        renpy.music.set_volume(vel/127.0, channel="audio") # Works on per-sound basis
                         renpy.play(self.pkeys[k], channel="audio")
                         renpy.music.set_volume(1.0, channel="audio")
 
