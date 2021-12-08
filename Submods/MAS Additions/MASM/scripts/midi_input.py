@@ -7,7 +7,9 @@ doReadInput = False
 def Start():
 	global inPort
 	try:
+		print(f"MIDI input: {mido.get_input_names()}")
 		inPort = mido.open_input()
+		print(f"MIDI input open: {inPort}")
 	except Exception as e:
 		inPort = None
 		print(f"Could not open MIDI input: {e}")
