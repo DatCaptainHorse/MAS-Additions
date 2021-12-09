@@ -32,7 +32,7 @@ init -990 python:
         dependencies={
             "Monika After Story Module" : (None, None)
         },
-        settings_pane="FDAR_settings_pane",
+        settings_pane="submods_dathorse_FDAR_settings_pane",
         version_updates={
             "submods_dathorse_FDAR_v2_0_0": "submods_dathorse_FDAR_v2_0_1"
         }
@@ -458,7 +458,7 @@ init -990 python:
             else:
                 return 0
 
-screen FDAR_settings_pane():
+screen submods_dathorse_FDAR_settings_pane():
     python:
         submods_screen = store.renpy.get_screen("submods", "screens")
         if submods_screen:

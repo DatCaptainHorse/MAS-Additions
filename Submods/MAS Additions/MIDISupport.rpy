@@ -1,9 +1,17 @@
 # Changelog #
-# no version -> 0.3.0
+# 1.0.0 -> 1.1.0
+# - Added option for MIDI keymap starting point
+# no version -> 1.0.0
 # - Added version number
 # - Using official Submod API
 # - Threading for faster responsiveness
 # - Only partially overrides default piano, easier to keep updated
+
+# TODO: MIDI input picker "- Added MIDI input picker"
+# TODO: Non-blocking MIDI keymap key picker
+
+default persistent.submods_dathorse_MIDI_keymapKey = 65
+
 init -990 python:
     store.mas_submod_utils.Submod(
         author="DatHorse",
@@ -11,57 +19,72 @@ init -990 python:
         description=(
             "Adds MIDI keyboard support to piano.\n"
         ),
-        version="1.0.0",
+        version="1.1.0",
         dependencies={
             "Monika After Story Module" : (None, None)
         },
+        settings_pane="submods_dathorse_MIDI_settings_pane",
         version_updates={}
     )
 
 init 811 python:
     import store
-    class PianoDisplayableOverride(PianoDisplayable):
+    class MIDI_PianoDisplayableOverride(PianoDisplayable):
         import time
         import pygame
         import threading
         import store.mas_piano_keys as mas_piano_keys
         def __init__(self, mode, pnml=None):
             MASM.sendData("MIDI_START")
+            self.MIDILock = threading.Lock()
             self.MIDIThreadRun = threading.Event()
             self.MIDIthread = threading.Thread(target = self._MIDIcallback)
             self.MIDIthread.start()
             self.midiCBKeys = {}
-            # MIDI key map
+            #self.mkeys = {}
+            self.setMIDIkeymap(persistent.submods_dathorse_MIDI_keymapKey)
+            super(MIDI_PianoDisplayableOverride, self).__init__(mode, pnml)
+
+        def setMIDIkeymap(self, startKey):
             self.mkeys = {
-                65: mas_piano_keys.F4,
-                66: mas_piano_keys.F4SH,
-                67: mas_piano_keys.G4,
-                68: mas_piano_keys.G4SH,
-                69: mas_piano_keys.A4,
-                70: mas_piano_keys.A4SH,
-                71: mas_piano_keys.B4,
-                72: mas_piano_keys.C5,
-                73: mas_piano_keys.C5SH,
-                74: mas_piano_keys.D5,
-                75: mas_piano_keys.D5SH,
-                76: mas_piano_keys.E5,
-                77: mas_piano_keys.F5,
-                78: mas_piano_keys.F5SH,
-                79: mas_piano_keys.G5,
-                80: mas_piano_keys.G5SH,
-                81: mas_piano_keys.A5,
-                82: mas_piano_keys.A5SH,
-                83: mas_piano_keys.B5,
-                84: mas_piano_keys.C6
+                startKey: mas_piano_keys.F4,
+                startKey + 1: mas_piano_keys.F4SH,
+                startKey + 2: mas_piano_keys.G4,
+                startKey + 3: mas_piano_keys.G4SH,
+                startKey + 4: mas_piano_keys.A4,
+                startKey + 5: mas_piano_keys.A4SH,
+                startKey + 6: mas_piano_keys.B4,
+                startKey + 7: mas_piano_keys.C5,
+                startKey + 8: mas_piano_keys.C5SH,
+                startKey + 9: mas_piano_keys.D5,
+                startKey + 10: mas_piano_keys.D5SH,
+                startKey + 11: mas_piano_keys.E5,
+                startKey + 12: mas_piano_keys.F5,
+                startKey + 13: mas_piano_keys.F5SH,
+                startKey + 14: mas_piano_keys.G5,
+                startKey + 15: mas_piano_keys.G5SH,
+                startKey + 16: mas_piano_keys.A5,
+                startKey + 17: mas_piano_keys.A5SH,
+                startKey + 18: mas_piano_keys.B5,
+                startKey + 19: mas_piano_keys.C6
             }
-            super(PianoDisplayableOverride, self).__init__(mode, pnml)
 
         def quitflow(self):
             MASM.sendData("MIDI_STOP")
             self.MIDIThreadRun.set()
             self.MIDIthread.join()
             renpy.music.set_volume(1.0, channel="audio") # Just in case
-            return super(PianoDisplayableOverride, self).quitflow()
+            return super(MIDI_PianoDisplayableOverride, self).quitflow()
+
+        @staticmethod
+        def _changeMIDIkeymapKey():
+            MASM.sendData("MIDI_KEYMAPKEY")
+            startTime = time.time()
+            while MASM.isWorking() and time.time() - startTime < 5.0:
+                if MASM.hasDataCheck("MIDI_KEY", int):
+                    persistent.submods_dathorse_MIDI_keymapKey = MASM.hasDataValue("MIDI_KEY", defaultValue = 65)
+                    break
+                time.sleep(0.1)
 
         def _MIDIcallback(self):
             while not self.MIDIThreadRun.is_set():
@@ -73,41 +96,43 @@ init 811 python:
                         if m is not None:
                             k = self.live_keymap.get(m, None)
                             if k is not None:
-                                self.midiCBKeys[k] = vel
+                                with self.MIDILock:
+                                    self.midiCBKeys[k] = vel
                                 renpy.redraw(self, 0)
                 else:
                     time.sleep(0) # Yield thread, can't sleep as it adds too much latency and timing is not stable
                             
         def render(self, ev, x, y, st):
-            for k, vel in self.midiCBKeys.viewitems():
-                if len(self.played) > self.KEY_LIMIT:
-                    self.played = list()
-                elif st - self.prev_time >= self.ev_timeout:
-                    self._timeoutFlow()
-                self.prev_time = st
-                if vel > 0:
-                    if not self.pressed.get(k, True):
-                        self.pressed[k] = True
-                        self.note_hit = True
-                        self.played.append(k)
-                        if self.state == self.STATE_LISTEN:
-                            self.stateListen(pygame.KEYDOWN, k)
-                        elif self.state in self.POST_STATES:
-                            self.statePost(pygame.KEYDOWN, k)
-                        elif self.state in self.TRANS_POST_STATES:
-                            self.stateWaitPost(pygame.KEYDOWN, k)
-                        elif self.state in self.MATCH_STATES:
-                            self.stateMatch(pygame.KEYDOWN, k)
-
-                        renpy.music.set_volume(vel/127.0, channel="audio") # Works on per-sound basis
-                        renpy.play(self.pkeys[k], channel="audio")
-                        renpy.music.set_volume(1.0, channel="audio")
-
-                elif vel == 0:
-                    if self.pressed.get(k, False):
-                        self.pressed[k] = False
-
-            return super(PianoDisplayableOverride, self).render(ev, x, y, st)
+            with self.MIDILock:
+                for k, vel in self.midiCBKeys.viewitems():
+                    if len(self.played) > self.KEY_LIMIT:
+                        self.played = list()
+                    elif st - self.prev_time >= self.ev_timeout:
+                        self._timeoutFlow()
+                    self.prev_time = st
+                    if vel > 0:
+                        if not self.pressed.get(k, True):
+                            self.pressed[k] = True
+                            self.note_hit = True
+                            self.played.append(k)
+                            if self.state == self.STATE_LISTEN:
+                                self.stateListen(pygame.KEYDOWN, k)
+                            elif self.state in self.POST_STATES:
+                                self.statePost(pygame.KEYDOWN, k)
+                            elif self.state in self.TRANS_POST_STATES:
+                                self.stateWaitPost(pygame.KEYDOWN, k)
+                            elif self.state in self.MATCH_STATES:
+                                self.stateMatch(pygame.KEYDOWN, k)
+    
+                            renpy.music.set_volume(vel/127.0, channel="audio") # Works on per-sound basis
+                            renpy.play(self.pkeys[k], channel="audio")
+                            renpy.music.set_volume(1.0, channel="audio")
+    
+                    elif vel == 0:
+                        if self.pressed.get(k, False):
+                            self.pressed[k] = False
+    
+            return super(MIDI_PianoDisplayableOverride, self).render(ev, x, y, st)
 
     v_list = config.version.split("-")[0].split(".") # *yoink* Thanks Mlem laf :)
     if v_list == ["0", "12", "4"]:
@@ -160,7 +185,7 @@ label submods_dathorse_MIDI_override_piano_setupstart:
         mas_MUMURaiseShield()
     stop music
     
-    $ piano_displayable_obj = PianoDisplayableOverride(play_mode, pnml=pnml)
+    $ piano_displayable_obj = MIDI_PianoDisplayableOverride(play_mode, pnml=pnml)
     $ ui.add(piano_displayable_obj)
     $ full_combo,is_win,is_practice,post_piano = ui.interact()
     $ ui.remove(piano_displayable_obj)
@@ -187,3 +212,27 @@ label submods_dathorse_MIDI_override_piano_setupstart:
 
 label submods_dathorse_MIDI_override_piano_loopend:
     return
+
+screen submods_dathorse_MIDI_settings_pane():
+    python:
+        submods_screen = store.renpy.get_screen("submods", "screens")
+        if submods_screen:
+            _tooltip = submods_screen.scope.get("tooltip", None)
+        else:
+            _tooltip = None
+
+    vbox:
+        box_wrap False
+        xfill True
+        xmaximum 1000
+        style_prefix "check"
+
+        hbox:
+            if _tooltip:
+                textbutton _("MIDI Starting key: {}".format(persistent.submods_dathorse_MIDI_keymapKey)):
+                    action Function(MIDI_PianoDisplayableOverride._changeMIDIkeymapKey)
+                    hovered SetField(_tooltip, "value", "Click to set the starting point for piano keys.\nMAS will freeze until MIDI key is pressed or 5 seconds have passed.")
+                    unhovered SetField(_tooltip, "value", _tooltip.default)
+            else:
+                textbutton _("MIDI Starting key: {}".format(persistent.submods_dathorse_MIDI_keymapKey)):
+                    action Function(MIDI_PianoDisplayableOverride._changeMIDIkeymapKey)

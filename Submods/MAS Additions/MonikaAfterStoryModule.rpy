@@ -20,6 +20,8 @@
 # - Renamed to short and simple MASM for less word spaghetti, also some functions to make more sense.
 # - Thread locks that hopefully fix any issues with reading data partially from somewhere before all is received.
 
+# TODO: API function for non-blocking value set for settings n such, MASM.variableData("UPDATE_X", x, timeout = 10, failure = None)
+
 default persistent.submods_dathorse_MASM_manual = False
 
 init -990 python:
@@ -31,7 +33,7 @@ init -990 python:
             "This submod by alone doesn't do much.\n"
         ),
         version="2.1.0",
-        settings_pane="MASM_settings_pane",
+        settings_pane="submods_dathorse_MASM_settings_pane",
         version_updates={}
     )
 
@@ -277,7 +279,7 @@ init -989 python:
     # Done after submods have had their decorators set so we can call them
     MASM._startFull()
     
-screen MASM_settings_pane():
+screen submods_dathorse_MASM_settings_pane():
     python:
         submods_screen = store.renpy.get_screen("submods", "screens")
         if submods_screen:
