@@ -5,7 +5,7 @@ Additions for Monika After Story mod for DDLC
 https://github.com/Monika-After-Story/MonikaModDev
 
 ### ⚠️ This project needs help in staying updated and working ⚠️
-Brain won't give me serotonin :(
+You can help by contributing, for example by making new topics using the Webcam API.
 
 ## Additions
 * MASM. MAS Module is an external program which enables the use of Python 3. Audio and Graphics features have been disabled for now. Required by other additions below.
@@ -15,7 +15,7 @@ Brain won't give me serotonin :(
 * MIDI. Adds MIDI keyboard support for the piano.
 
 ## Downloading and Installing
-1. Go to Releases link visible on the right side.
+1. Go to [Releases page](https://github.com/CaptainHorse/MAS-Additions/releases) visible on the right side.
 2. Install instructions are listed on the latest release.
 
 ## Credits
