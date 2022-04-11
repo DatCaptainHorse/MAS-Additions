@@ -135,7 +135,8 @@ init 811 python:
             return super(MIDI_PianoDisplayableOverride, self).render(ev, x, y, st)
 
     v_list = config.version.split("-")[0].split(".") # *yoink* Thanks Mlem laf :)
-    if v_list == ["0", "12", "4"]:
+    v_list = [ int(x) for x in v_list ] # Convert to integers
+    if v_list <= [ 0, 12, 8 ] and v_list >= [ 0, 12, 4 ]:
         mas_override_label("mas_piano_start", "submods_dathorse_MIDI_override_piano_start")
         mas_override_label("mas_piano_loopstart", "submods_dathorse_MIDI_override_piano_loopstart")
         mas_override_label("mas_piano_songchoice", "submods_dathorse_MIDI_override_piano_songchoice")
