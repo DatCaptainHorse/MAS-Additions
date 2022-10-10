@@ -1,4 +1,6 @@
 # Changelog #
+# 1.1.0 -> 1.2.0
+# - Added MIDI message batching
 # 1.0.0 -> 1.1.0
 # - Added option for MIDI keymap starting point
 # no version -> 1.0.0
@@ -19,7 +21,7 @@ init -990 python:
         description=(
             "Adds MIDI keyboard support to piano.\n"
         ),
-        version="1.1.0",
+        version="1.2.0",
         dependencies={
             "Monika After Story Module" : (None, None)
         },
@@ -88,17 +90,18 @@ init 811 python:
 
         def _MIDIcallback(self):
             while not self.MIDIThreadRun.is_set():
-                msg, vel = MASM.hasDataWith("MIDI_NOTE")
-                if msg is not None and vel is not None:
-                    splitted = msg.split(".")
-                    if len(splitted) > 1:
-                        m = self.mkeys.get(int(splitted[1]), None)
-                        if m is not None:
-                            k = self.live_keymap.get(m, None)
-                            if k is not None:
-                                with self.MIDILock:
-                                    self.midiCBKeys[k] = vel
-                                renpy.redraw(self, 0)
+                notes, batch = MASM.hasDataWith("MIDI_NOTES")
+                if notes is not None and batch is not None and len(batch) > 0:
+                    for msg, vel in batch:
+                        splitted = msg.split(".")
+                        if len(splitted) > 1:
+                            m = self.mkeys.get(int(splitted[1]), None)
+                            if m is not None:
+                                k = self.live_keymap.get(m, None)
+                                if k is not None:
+                                    with self.MIDILock:
+                                        self.midiCBKeys[k] = vel
+                                    renpy.redraw(self, 0)
                 else:
                     time.sleep(0) # Yield thread, can't sleep as it adds too much latency and timing is not stable
                             
@@ -136,7 +139,7 @@ init 811 python:
 
     v_list = config.version.split("-")[0].split(".") # *yoink* Thanks Mlem laf :)
     v_list = [ int(x) for x in v_list ] # Convert to integers
-    if v_list <= [ 0, 12, 8 ] and v_list >= [ 0, 12, 4 ]:
+    if v_list <= [ 0, 12, 99 ] and v_list >= [ 0, 12, 4 ]:
         mas_override_label("mas_piano_start", "submods_dathorse_MIDI_override_piano_start")
         mas_override_label("mas_piano_loopstart", "submods_dathorse_MIDI_override_piano_loopstart")
         mas_override_label("mas_piano_songchoice", "submods_dathorse_MIDI_override_piano_songchoice")
