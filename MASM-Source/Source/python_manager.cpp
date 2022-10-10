@@ -30,7 +30,7 @@ namespace MASM {
 		config.install_signal_handlers = 0;
 
 		// Find embedded Python folder
-		auto embeddedPath = path / "python39";
+		auto embeddedPath = path / "python-embed";
 		if (!std::filesystem::exists(embeddedPath)) {
 			spdlog::error("Could not locate embedded python directory");
 			return false;

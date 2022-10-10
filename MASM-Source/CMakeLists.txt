@@ -29,7 +29,7 @@ elseif(AWFUL_HACK_TO_BUILD_ON_BINS_SYSTEM)
   set(spdlog_DIR "${VCPKG_ROOT}/installed/${VCPKG_TRIPLET}/share/spdlog")
 endif()
 
-find_package(Python3 3.9 EXACT COMPONENTS Development REQUIRED)
+find_package(Python3 3.10 EXACT COMPONENTS Development REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 
