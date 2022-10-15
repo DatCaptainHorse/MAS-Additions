@@ -55,8 +55,8 @@ jobs:
         with:
           name: "MASM-${{ matrix.os }}-${{ matrix.arch }}"
           path: |
-            "./MASM-Source/build/install/windows/${{ matrix.arch }}/bin/MASM.exe"
-            "./MASM-Source/build/install/windows/${{ matrix.arch }}/bin/python310.dll"
+            "./build/install/bin/MASM.exe"
+            "./build/install/bin/python310.dll"
 
       - name: "Upload artifacts (Linux)"
         if: matrix.os == 'ubuntu-latest'
@@ -64,7 +64,7 @@ jobs:
         with:
           name: "MASM-${{ matrix.os }}-${{ matrix.arch }}"
           path: |
-            "./MASM-Source/build/install/linux/${{ matrix.arch }}/bin/MASM"
+            "./build/install/bin/MASM"
 
       - name: "Upload artifacts (macOS)"
         if: matrix.os == 'macos-latest'
@@ -72,4 +72,4 @@ jobs:
         with:
           name: "MASM-${{ matrix.os }}-${{ matrix.arch }}"
           path: |
-            "./MASM-Source/build/install/macosx/${{ matrix.arch }}/bin/MASM"
+            "./build/install/bin/MASM"
