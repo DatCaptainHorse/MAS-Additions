@@ -1,5 +1,5 @@
 .vs/
 [Bb]uild*/
-vcpkg/
-vcpkg_installed/
-CMakeSettings.json
+.xmake/
+.vscode/
+.idea/
