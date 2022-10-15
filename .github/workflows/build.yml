@@ -9,27 +9,68 @@ on:
     branches: [ "master", "release/**" ]
 
 jobs:
-  windows_build:
-    name: "Build - Windows x64"
-    runs-on: windows-latest
+  all_builds_matrix:
+    fail-fast: false
+    strategy:
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+        arch: [ i386, x86_64 ]
+        exclude:
+          - os: ubuntu-latest
+            arch: i386
+          - os: macos-latest
+            arch: i386
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} ${{ matrix.arch }}
+
+    defaults:
+      run:
+        working-directory: "./MASM-Source"
 
     steps:
       - name: "Checkout"
         uses: actions/checkout@v3
 
       - name: "Setup MSBuild"
-        uses: microsoft/setup-msbuild@v1.1.3
+        if: matrix.os == 'windows-latest'
+        uses: microsoft/setup-msbuild@v1
 
       - name: "Setup xmake"
-        uses: xmake-io/github-action-setup-xmake@v1.0.13
+        uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
 
       - name: "Configure xmake"
-        run: "xmake f -m release -y"
+        run: "xmake f -m release -y -a ${{ matrix.arch }}"
 
       - name: "Build using xmake"
         run: "xmake"
 
       - name: "Create installable package"
         run: "xmake install"
+
+      - name: "Upload artifacts (Windows)"
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: "MASM-${{ matrix.os }}-${{ matrix.arch }}"
+          path: |
+            "./MASM-Source/build/install/windows/${{ matrix.arch }}/bin/MASM.exe"
+            "./MASM-Source/build/install/windows/${{ matrix.arch }}/bin/python310.dll"
+
+      - name: "Upload artifacts (Linux)"
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: "MASM-${{ matrix.os }}-${{ matrix.arch }}"
+          path: |
+            "./MASM-Source/build/install/linux/${{ matrix.arch }}/bin/MASM"
+
+      - name: "Upload artifacts (macOS)"
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: "MASM-${{ matrix.os }}-${{ matrix.arch }}"
+          path: |
+            "./MASM-Source/build/install/macosx/${{ matrix.arch }}/bin/MASM"
