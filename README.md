@@ -20,7 +20,7 @@ You can help by contributing, for example by making new topics using the Webcam 
 
 ## Credits
 
-*  DatHorse, self-explanatory. (Discord: DatHorse#9516)
+*  DatHorse, self-explanatory. (Discord: dathorse)
 *  LordBaaa, helping to test new features. [Github user page](https://github.com/LordBaaa)
 *  bin, helping with code and Linux binary builds. [Github user page](https://github.com/flumf)
 *  SykkNyzz, helping to test Linux support and suggesting features.
@@ -30,4 +30,4 @@ You can help by contributing, for example by making new topics using the Webcam 
 
 Report any bugs and issues you may have to the Issues tab.
 
-If your case is urgent. Try contacting me through DatHorse#9516 on Discord
+If your case is urgent. Try contacting me by "dathorse" on Discord
